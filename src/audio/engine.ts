@@ -1,6 +1,6 @@
 import * as Tone from 'tone';
 import type { LayerId, LayerInfo, WindowData } from '../data/types';
-import { buildPattern, STEPS, type Pattern, type Step } from './loop';
+import { buildPattern, scanPan, STEPS, type Pattern, type Step } from './loop';
 import { VOICES, type Instrument, type VoiceMapping } from './mapping';
 
 interface Manifest {
@@ -50,11 +50,6 @@ export class Voice {
     this.piano.chain(felt, this.panner);
   }
 
-  /** Samples arrive pre-decoded, so load only waits for the samplers to settle. */
-  async load() {
-    await Tone.loaded();
-  }
-
   /** Queue a new loop from window data. It swaps in at the next bar line. */
   render(win: WindowData, layer: LayerInfo) {
     this.pending = buildPattern(win, layer, this.map, this.keyRoot());
@@ -66,7 +61,6 @@ export class Voice {
   scrub(win: WindowData, layer: LayerInfo) {
     const p = buildPattern(win, layer, this.map, this.keyRoot());
     this.lp.frequency.rampTo(p.cutoffHz, 0.1);
-    this.panner.pan.rampTo(p.pan, 0.3);
     if (this.enabled) this.level.gain.rampTo(this.gainFor(p), 0.1);
   }
 
@@ -98,7 +92,6 @@ export class Voice {
     this.pending = null;
     this.xfade.fade.rampTo(this.active, 0.4, time); // CrossFade is equal-power
     this.lp.frequency.rampTo(this.current.cutoffHz, 0.4, time);
-    this.panner.pan.rampTo(this.current.pan, 4, time); // slow stereo drift from the gradient
     this.level.gain.rampTo(this.enabled ? this.gainFor(this.current) : 0, 0.4, time);
   }
 
@@ -108,6 +101,8 @@ export class Voice {
     const p = this.patterns[this.active];
     if (!this.enabled || !p) return null;
     const step = p.steps[i];
+    // Stereo follows the scan line: west left, east right (snap back quickly at the loop start).
+    this.panner.pan.rampTo(scanPan(p.pan, i), i === 0 ? 0.15 : stepSec, time);
     this.trigger(step, time, stepSec, this.lanes[this.active]);
     return step;
   }
@@ -130,7 +125,7 @@ export class Voice {
   }
 }
 
-export type OneShot = 'clave' | 'framedrum' | 'smallbell' | 'gong' | 'cymbal' | 'ratchet' | 'thump' | 'singingbowl' | 'wave' | 'whoosh' | 'windchime';
+export type OneShot = 'clave' | 'framedrum' | 'smallbell' | 'gong' | 'cymbal' | 'ratchet' | 'thump' | 'singingbowl' | 'wave' | 'whoosh' | 'windchime' | 'oceanbed' | 'landbed';
 
 export interface PlayOpts { rate?: number; db?: number; at?: number; reverse?: boolean; lowpass?: number }
 
@@ -151,6 +146,7 @@ class AudioEngine {
   private mono!: Tone.Mono;
   private whooshGain!: Tone.Gain;
   private manyTimer = 0;
+  private beds: Record<string, Tone.Gain> = {};
   private speaking = false;
   private eventUntil = 0;
 
@@ -204,9 +200,18 @@ class AudioEngine {
       const bufs = await load(manifest.instruments[map.instrument] ?? {});
       if (!Object.keys(bufs).length) { this.missing.push(`instrument ${map.instrument}`); return; }
       const v = new Voice(map, bufs, piano, this.stack, () => this.keyRoot);
-      await v.load();
       this.voices.set(map.layer, v);
     }));
+
+    // Ambience beds: sea and land recordings, mixed by the land share of the window. Kept very quiet.
+    for (const [name, filter] of [['oceanbed', new Tone.Filter(1400, 'lowpass')], ['landbed', new Tone.Filter(250, 'highpass')]] as const) {
+      const buf = this.shots[name];
+      if (!buf) continue;
+      const g = new Tone.Gain(0);
+      // Skip the MP3 encoder padding at both ends so the loop has no gap.
+      new Tone.Player({ url: buf, loop: true, loopStart: 0.06, loopEnd: buf.duration - 0.06 }).chain(filter, g, this.duck).start();
+      this.beds[name] = g;
+    }
 
     // Window-moving whoosh: a looping field-recording slice, level follows drag speed.
     this.whooshGain = new Tone.Gain(0).connect(this.events);
@@ -286,6 +291,19 @@ class AudioEngine {
 
   setMoveSpeed(degPerSec: number) {
     this.whooshGain?.gain.rampTo(Math.min(1, degPerSec / 40) * 0.6, 0.08);
+  }
+
+  /** landShare 0 = all water, 1 = all land. Equal-power mix of the two beds. */
+  setSurface(landShare: number) {
+    const bed = Tone.dbToGain(-20);
+    this.beds.oceanbed?.gain.rampTo(bed * Math.cos((landShare * Math.PI) / 2), 0.25);
+    this.beds.landbed?.gain.rampTo(bed * Math.sin((landShare * Math.PI) / 2), 0.25);
+  }
+
+  /** Position of the scan line in the loop, 0..1 (west to east). */
+  loopPhase(): number {
+    const t = Tone.getTransport();
+    return ((t.ticks / t.PPQ) % STEPS) / STEPS;
   }
 
   setMasterVolume(v: number) { this.volume?.gain.rampTo(v, 0.1); }

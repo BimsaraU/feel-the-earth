@@ -19,7 +19,7 @@ describe('assist answers', () => {
   it('what am I hearing', () => {
     const wind = layers.find((l) => l.id === 'wind')!;
     expect(whatAmIHearing([{ layer: wind, voice: voiceFor('wind'), mean: 24 }])).toBe(
-      'Demo data, not NASA data. Wind speed, 24 metres per second, high. You hear it as the flute. Faster notes mean stronger wind.');
+      'Demo data, not NASA data. Wind speed, 24 metres per second, high. You hear it as the flute. Louder means stronger wind. The scan runs west to east; higher notes are further north.');
     expect(whatAmIHearing([{ layer: wind, voice: voiceFor('wind'), mean: NaN }])).toContain('no data');
   });
 

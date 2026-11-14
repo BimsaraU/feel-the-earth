@@ -42,6 +42,17 @@ export class GeoGrid {
     return this.meta.seas[this.sea[this.cell(lat, lon)] - 1] ?? 'open ocean';
   }
 
+  /** Share of land in a box, 0..1, from a 10 x 10 sample. */
+  landShare(box: { west: number; east: number; south: number; north: number }): number {
+    let land = 0;
+    for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) {
+      const lat = box.south + ((i + 0.5) * (box.north - box.south)) / 10;
+      const lon = box.west + ((j + 0.5) * (box.east - box.west)) / 10;
+      if (this.countryId(lat, lon) > 0) land++;
+    }
+    return land / 100;
+  }
+
   /** Ring search outwards for the nearest cell whose land state differs. Called on demand, not per frame. */
   nearestCoast(lat: number, lon: number, maxKm = 3000): { km: number; bearingDeg: number } | null {
     const { res } = this.meta;

@@ -1,7 +1,7 @@
 import { engine } from '../audio/engine';
 import { HAPTICS, type HapticPattern } from '../audio/mapping';
 
-type Driver = 'capacitor' | 'vibrate' | 'audio';
+type Driver = 'capacitor' | 'vibrate' | 'audio' | 'none';
 
 interface CapacitorHaptics { impact(o: { style: 'LIGHT' | 'MEDIUM' | 'HEAVY' }): Promise<void> }
 declare global {
@@ -13,7 +13,8 @@ function detect(): Driver {
   if (cap?.isNativePlatform?.() && cap.Plugins?.Haptics) return 'capacitor';
   // Desktop Chrome exposes navigator.vibrate but has no motor, so only trust it on Android.
   if (typeof navigator.vibrate === 'function' && /Android/i.test(navigator.userAgent)) return 'vibrate';
-  return 'audio';
+  // Thump stands in for a motor on touch devices (iOS Safari). With a mouse the event sounds already carry it.
+  return matchMedia('(pointer: coarse)').matches ? 'audio' : 'none';
 }
 
 export const haptics = {
@@ -26,7 +27,7 @@ export const haptics = {
 
   /** Fire now, at the event time; never wait for the sound to finish. */
   pulse(name: HapticPattern) {
-    if (!this.enabled) return;
+    if (!this.enabled || this.driver === 'none') return;
     const pattern = HAPTICS[name];
     if (this.driver === 'vibrate' && navigator.vibrate(pattern)) return;
     let t = 0;

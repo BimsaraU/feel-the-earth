@@ -37,7 +37,7 @@ export function whereAmI(geo: GeoGrid, lat: number, lon: number, size: number, d
     : `No ${onLand ? 'coast' : 'land'} within 3,000 kilometres.`;
   return [
     `Window centre ${coord(lat, 'north', 'south')}, ${coord(lon, 'east', 'west')}, over ${placeName(geo, lat, lon)}.`,
-    `The window is ${size} degrees wide, about ${roughKm(widthKm)}.`,
+    `The window is ${Math.round(size * 10) / 10} degrees wide, about ${roughKm(widthKm)}.`,
     coastText,
     `Date: ${spokenDate(date)}.`,
   ].join(' ');
@@ -52,5 +52,5 @@ export function whatAmIHearing(items: Heard[]): string {
     return `${layer.name}, ${spokenNumber(mean)} ${layer.unitSpoken}, ${levelWord(norm(mean, layer))}. You hear it as ${voice.instrumentSpoken}. ${voice.hear}`;
   });
   const demo = items.some((i) => i.layer.demo) ? 'Demo data, not NASA data. ' : '';
-  return demo + parts.join(' ');
+  return `${demo}${parts.join(' ')} The scan runs west to east; higher notes are further north.`;
 }

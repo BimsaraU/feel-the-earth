@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FixtureSource } from '../data/fixture';
+import { PENTATONIC, ROWS } from './loop';
 import { denorm, norm, renderMappingMarkdown, scaleNotes, VOICES } from './mapping';
 
 const layers = await new FixtureSource().listLayers();
@@ -20,8 +21,8 @@ describe('mapping table', () => {
     expect(new Set(VOICES.map((v) => v.key)).size).toBe(VOICES.length);
   });
 
-  it('every voice register holds at least an octave of the default key', () => {
-    for (const v of VOICES) expect(scaleNotes(2, ...v.register).length).toBeGreaterThanOrEqual(8);
+  it('every voice register holds one pentatonic note per scan row in every key', () => {
+    for (const v of VOICES) for (let k = 0; k < 12; k++) expect(scaleNotes(k, ...v.register, PENTATONIC).length).toBeGreaterThanOrEqual(ROWS);
   });
 
   it('docs/MAPPING.md matches the table (npm run mapping regenerates it)', async () => {
