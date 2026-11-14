@@ -20,19 +20,20 @@ npm run mapping    # regenerate docs/MAPPING.md from src/audio/mapping.ts
 ```
 
 Assets are committed. To rebuild them (needs network):
-`python scripts/prepare_audio.py` and `python scripts/build_geo.py` (numpy, scipy, matplotlib, soundfile, imageio-ffmpeg).
+`python scripts/prepare_audio.py` and `python scripts/build_geo.py` and `python scripts/build_imagery.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
 
 ## Keys
 
 | Key | Action |
 |---|---|
-| Arrows / Shift+arrows | Move window a quarter / full width |
+| Arrows (hold) / Shift+arrows | Glide the window; a tap moves at least a quarter / full width. Speed in Navigate |
 | + / - | Grow / shrink window (2 to 30 degrees) |
 | 1 to 8 | Toggle layers (up to 4) |
 | , and . / Shift+, and . | Day / month back and forward |
 | W / H | Where am I? / What am I hearing? |
 | G | Arrows turn the globe instead |
 | T | Audio legend (tutorial) |
+| V | Voice guide on / off (spoken help; captions stay) |
 | Space | Play / pause |
 | Esc | Stop speech and tutorial |
 

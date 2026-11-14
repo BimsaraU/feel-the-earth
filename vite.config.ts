@@ -23,7 +23,7 @@ export default defineConfig({
       },
       workbox: {
         // Everything the demo needs is precached so it runs offline after the first visit.
-        globPatterns: ['**/*.{js,css,html,svg,png,mp3,bin,json,geojson}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,jpg,woff2,mp3,bin,json,geojson}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
     }),

@@ -10,6 +10,7 @@ by `scripts/prepare_audio.py`. Geodata is rasterised by `scripts/build_geo.py`.
 |---|---|---|
 | `public/data/geo/grid.bin`, `meta.json`, `countries.geojson` | Natural Earth 1:50m Admin 0 Countries, [ne_50m_admin_0_countries.geojson](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson), https://www.naturalearthdata.com/ | Public domain |
 | `public/data/geo/grid.bin` (sea names) | Natural Earth 1:50m Marine Areas, [ne_50m_geography_marine_polys.geojson](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_geography_marine_polys.geojson) | Public domain |
+| `public/tiles/**` | NASA Earth Observatory (Reto Stöckli, NASA GSFC), Blue Marble "Whole world - land and oceans", [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Whole_world_-_land_and_oceans.jpg) | Public domain (NASA) |
 | Layer values (all 8 layers) | **DEMO DATA**, generated in `src/data/fixture.ts`. Not NASA data. | Project code |
 
 ## Software
@@ -21,6 +22,9 @@ by `scripts/prepare_audio.py`. Geodata is rasterised by `scripts/build_geo.py`.
 | [React](https://react.dev) | MIT |
 | [zustand](https://github.com/pmndrs/zustand) | MIT |
 | [vite-plugin-pwa / Workbox](https://github.com/vite-pwa/vite-plugin-pwa) | MIT |
+| [GSAP](https://gsap.com) | GSAP Standard License (no-charge, includes commercial use) |
+| [Fraunces](https://github.com/undercasetype/Fraunces) via @fontsource-variable | SIL Open Font License 1.1 |
+| [Outfit](https://github.com/Outfitio/Outfit-Fonts) via @fontsource-variable | SIL Open Font License 1.1 |
 
 ## Audio
 
@@ -29,7 +33,7 @@ The upright piano (`piano/*`, used as the felt-piano no-data pulse) is VSCO-2-CE
 
 Field recordings and percussion from Wikimedia Commons are credited per file below. The singing bowl
 recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a derivative and is shared under the same licence.
-`oneshots/whoosh.mp3` is a second slice of the same ocean recording as `oneshots/wave.mp3` (see DECISIONS.md).
+`oneshots/whoosh.mp3` and `oneshots/oceanbed.mp3` are further slices of the same ocean recording as `oneshots/wave.mp3` (see DECISIONS.md).
 
 | File | Source | Licence |
 |---|---|---|
@@ -126,3 +130,5 @@ recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a deri
 | `public/audio/oneshots/wave.mp3` | [Oceanwavescrushing.ogg](https://commons.wikimedia.org/wiki/File:Oceanwavescrushing.ogg) by Luftrum | CC BY 3.0 |
 | `public/audio/oneshots/whoosh.mp3` | [Oceanwavescrushing.ogg](https://commons.wikimedia.org/wiki/File:Oceanwavescrushing.ogg) by Luftrum | CC BY 3.0 |
 | `public/audio/oneshots/windchime.mp3` | [Windchimes.ogg](https://commons.wikimedia.org/wiki/File:Windchimes.ogg) by Esc861 | Public domain |
+| `public/audio/oneshots/oceanbed.mp3` | [Oceanwavescrushing.ogg](https://commons.wikimedia.org/wiki/File:Oceanwavescrushing.ogg) by Luftrum | CC BY 3.0 |
+| `public/audio/oneshots/landbed.mp3` | [Gentle breeze and birds singing.ogg](https://commons.wikimedia.org/wiki/File:Gentle_breeze_and_birds_singing.ogg) by ezwa | Public domain |

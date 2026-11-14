@@ -1,5 +1,6 @@
-// Perceptually ordered, colour-blind-safe ramp (viridis stops). Always paired with numbers in the legend.
-const STOPS: [number, number, number][] = [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]];
+// Perceptually ordered ramp from deep teal through mint to warm sand: lightness rises monotonically,
+// so order reads without hue (colour-blind safe). Always paired with numbers in the legend.
+const STOPS: [number, number, number][] = [[12, 38, 52], [22, 92, 98], [62, 160, 132], [158, 226, 178], [246, 232, 178]];
 
 export function colour(t: number): [number, number, number] {
   const x = Math.min(1, Math.max(0, t)) * (STOPS.length - 1);

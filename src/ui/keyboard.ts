@@ -1,5 +1,5 @@
 import { VOICES } from '../audio/mapping';
-import { askWhat, askWhere, resize, step, stepDate, toggleLayer, togglePlay } from '../controller';
+import { askWhat, askWhere, toggleVoice, glideStart, glideStop, resize, stepDate, toggleLayer, togglePlay } from '../controller';
 import { say } from '../assist/speech';
 import { runTutorial, stopTutorial } from '../assist/tutorial';
 import { useApp } from '../state';
@@ -19,7 +19,7 @@ export function onKey(e: KeyboardEvent) {
     if (useApp.getState().globeMode) {
       const d = e.shiftKey ? 30 : 10;
       rotateGlobe(dir === 'n' ? d : dir === 's' ? -d : 0, dir === 'e' ? d : dir === 'w' ? -d : 0);
-    } else step(dir, e.shiftKey);
+    } else if (!e.repeat) glideStart(dir, e.shiftKey); // held keys glide until keyup
   } else if (e.key === '+' || e.key === '=') resize(1);
   else if (e.key === '-' || e.key === '_') resize(-1);
   else if (/^Digit[1-9]$/.test(e.code)) {
@@ -30,6 +30,7 @@ export function onKey(e: KeyboardEvent) {
   else if (e.code === 'KeyW') askWhere();
   else if (e.code === 'KeyH') void askWhat();
   else if (e.code === 'KeyT') void runTutorial();
+  else if (e.code === 'KeyV') toggleVoice();
   else if (e.code === 'KeyG') {
     const globeMode = !useApp.getState().globeMode;
     useApp.getState().set({ globeMode });
@@ -38,4 +39,9 @@ export function onKey(e: KeyboardEvent) {
   else if (e.key === 'Escape') stopTutorial();
   else return;
   e.preventDefault();
+}
+
+export function onKeyUp(e: KeyboardEvent) {
+  const dir = ARROWS[e.key];
+  if (dir) glideStop(dir);
 }

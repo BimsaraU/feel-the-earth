@@ -10,6 +10,7 @@ import type { BBox, LayerId } from './data/types';
 import { GeoEventTracker, LINE_NAMES, type GeoEvent } from './geo/events';
 import { loadGeo, type GeoGrid } from './geo/grid';
 import { haptics } from './haptics/haptics';
+import { gsap } from 'gsap';
 import { MAX_LAT, MAX_LAYERS, MAX_SIZE, MIN_SIZE, useApp } from './state';
 
 export let geo: GeoGrid | null = null;
@@ -45,13 +46,14 @@ async function boot() {
   useApp.subscribe((s, prev) => { if (s.settings !== prev.settings) applySettings(prev.settings.keyRoot !== s.settings.keyRoot); });
   engine.onAccent = () => { if (st().settings.hapticAccents) haptics.pulse('accent'); };
   syncVoices();
+  updateSurface();
   await regenerate();
   engine.startLoop();
   st().set({ playing: true });
   const demo = layers.some((l) => l.demo) ? 'This build plays DEMO DATA, not NASA data. ' : '';
   void say(`${demo}Feel the Earth. You are listening to ${placeName(g, st().lat, st().lon)}. ` +
     'Arrow keys move the listening window. Plus and minus change its size. Numbers 1 to 8 switch layers. ' +
-    'W: where am I. H: what am I hearing. Comma and full stop step through days. T plays the audio legend.');
+    'W: where am I. H: what am I hearing. Comma and full stop step through days. T plays the audio legend. V turns this voice off.');
 }
 
 function applySettings(keyChanged = false) {
@@ -79,13 +81,16 @@ export function scheduleRegen() {
 async function regenerate() {
   const { lat, lon, size, date, active } = st();
   const box = bboxOf(lat, lon, size);
+  const means: Partial<Record<LayerId, number>> = {};
   await Promise.all(active.map(async (id) => {
     const win = await source.getWindow(id, box, date, 32);
+    means[id] = win.stats.mean;
     const pattern = engine.voices.get(id)?.render(win, layerInfo(id));
     const noData = !!pattern?.steps.some((s) => s.noData);
     if (noData && !hadNoData.has(id)) haptics.pulse('noData');
     if (noData) hadNoData.add(id); else hadNoData.delete(id);
   }));
+  st().set({ means });
 }
 
 let scrubQueued = false;
@@ -122,7 +127,7 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
   lon = normLon(lon);
   const now = performance.now();
   const events: GeoEvent[] = tracker ? tracker.update(lat, lon, now, settle) : [];
-  if (pole) events.push({ type: 'pole', which: pole });
+  if (pole && (settle || st().lat !== lat)) events.push({ type: 'pole', which: pole });
 
   // Whoosh level follows speed.
   const dt = Math.max(16, now - lastMove.t) / 1000;
@@ -133,6 +138,7 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
   whooshStop = window.setTimeout(() => engine.setMoveSpeed(0), settle ? 250 : 120);
 
   st().set({ lat, lon });
+  updateSurface();
   events.forEach((e) => playEvent(e));
   if (settle) {
     const turn = events.filter((e) => e.type === 'border' || e.type === 'coast').pop();
@@ -148,10 +154,74 @@ export function moveBy(dLat: number, dLon: number) {
   setCenter(lat + dLat, lon + dLon, true);
 }
 
-/** Arrow-key step: a quarter (or full, with Shift) of the window width. */
-export function step(dir: 'n' | 's' | 'e' | 'w', full = false) {
-  const d = st().size * (full ? 1 : 0.25);
-  moveBy(dir === 'n' ? d : dir === 's' ? -d : 0, dir === 'e' ? d : dir === 'w' ? -d : 0);
+function updateSurface() {
+  const { lat, lon, size } = st();
+  if (geo) engine.setSurface(geo.landShare(bboxOf(lat, lon, size)));
+}
+
+// Smooth gliding: held arrows move at settings.navSpeed window widths per second, with eased start and stop.
+// A tap still travels at least a quarter width (a full width with Shift), as the keyboard spec asks.
+export type Dir = 'n' | 's' | 'e' | 'w';
+const held = new Set<Dir>();
+const glide = { raf: 0, last: 0, vLat: 0, vLon: 0, travelled: 0, min: 0, dir: 'n' as Dir };
+
+export function glideStart(dir: Dir, full = false) {
+  if (!st().started) return;
+  held.add(dir);
+  glide.dir = dir;
+  glide.min = st().size * (full ? 1 : 0.25);
+  glide.travelled = 0;
+  if (glide.raf) return;
+  glide.last = performance.now();
+  dragStart();
+  glide.raf = requestAnimationFrame(glideTick);
+}
+
+export function glideStop(dir: Dir) {
+  held.delete(dir);
+}
+
+/** One discrete step (buttons activated by keyboard, screen readers). */
+export function step(dir: Dir, full = false) {
+  glideStart(dir, full);
+  glideStop(dir);
+}
+
+const VEC: Record<Dir, [number, number]> = { n: [1, 0], s: [-1, 0], e: [0, 1], w: [0, -1] };
+
+function glideEnd() {
+  glide.raf = 0;
+  glide.vLat = glide.vLon = 0;
+  const { lat, lon } = st();
+  setCenter(lat, lon, true); // commit pending borders, speak "Now over"
+  dragEnd();
+}
+
+function glideTick(now: number) {
+  const dt = Math.min(0.05, (now - glide.last) / 1000);
+  glide.last = now;
+  const { size, lat, lon, settings } = st();
+  const speed = settings.navSpeed * size;
+  let dLat: number, dLon: number;
+  if (!held.size && glide.travelled < glide.min) {
+    // Released before a full step: ease out and land exactly on the step distance.
+    const rem = glide.min - glide.travelled;
+    const d = Math.min(rem, Math.min(speed, Math.max(rem * 6, speed * 0.05)) * dt);
+    const [a, b] = VEC[glide.dir];
+    [dLat, dLon] = [a * d, b * d];
+    glide.vLat = (a * d) / dt; glide.vLon = (b * d) / dt;
+    glide.travelled += d;
+    setCenter(lat + dLat, lon + dLon, false);
+    if (glide.min - glide.travelled < 1e-6) return glideEnd();
+  } else {
+    const k = 1 - Math.exp(-dt * 9); // ease towards the target velocity
+    glide.vLat += ((held.has('n') ? speed : 0) - (held.has('s') ? speed : 0) - glide.vLat) * k;
+    glide.vLon += ((held.has('e') ? speed : 0) - (held.has('w') ? speed : 0) - glide.vLon) * k;
+    if (!held.size && Math.hypot(glide.vLat, glide.vLon) < speed * 0.03) return glideEnd();
+    glide.travelled += Math.hypot(glide.vLat, glide.vLon) * dt;
+    setCenter(lat + glide.vLat * dt, lon + glide.vLon * dt, false);
+  }
+  glide.raf = requestAnimationFrame(glideTick);
 }
 
 export function dragStart() {
@@ -165,15 +235,31 @@ export function dragEnd() {
   scheduleRegen();
 }
 
+const sizeAnim = { v: 10 };
+
 export function resize(dir: 1 | -1) {
-  const { size } = st();
+  const size = Math.round(st().size);
   const next = Math.min(MAX_SIZE, Math.max(MIN_SIZE, size + dir * (size < 10 ? 1 : 5)));
   if (next === size) {
     void say(`Window is already at its ${dir > 0 ? 'largest' : 'smallest'}, ${size} degrees.`);
     return;
   }
-  st().set({ size: next });
+  setSize(next, true);
+}
+
+/** Change window size. animate: glide there with GSAP (keys, buttons); otherwise follow a drag directly. */
+export function setSize(next: number, animate: boolean) {
+  next = Math.min(MAX_SIZE, Math.max(MIN_SIZE, next));
+  gsap.killTweensOf(sizeAnim);
+  const apply = () => { st().set({ size: sizeAnim.v }); updateSurface(); scrub(); };
+  if (!animate) { sizeAnim.v = next; apply(); return; }
+  sizeAnim.v = st().size;
+  gsap.to(sizeAnim, { v: next, duration: 0.35, ease: 'power2.out', onUpdate: apply, onComplete: () => scheduleRegen() });
   void say(`Window ${next} degrees.`);
+}
+
+export function sizeDone() {
+  void say(`Window ${Math.round(st().size)} degrees.`);
   scheduleRegen();
 }
 
@@ -282,4 +368,12 @@ export function togglePlay() {
   if (playing) engine.startLoop(); else engine.pauseLoop();
   st().set({ playing });
   void say(playing ? 'Playing.' : 'Paused.');
+}
+
+/** Spoken assistance on or off. Off: no speech at all, text still goes to the caption and aria-live region. */
+export function toggleVoice() {
+  const voice = !st().settings.voice;
+  if (!voice) void say('Voice guide off.'); // last words, then silence
+  st().setSettings({ voice });
+  if (voice) void say('Voice guide on.');
 }

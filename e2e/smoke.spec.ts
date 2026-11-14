@@ -10,6 +10,7 @@ test('load, unlock audio, move, toggle a layer, ask both questions', async ({ pa
   await expect(caption).toContainText('Feel the Earth.', { timeout: 30_000 });
 
   await page.keyboard.press('ArrowRight'); // quarter of 10 degrees east
+  await expect(page.locator('.coords')).toContainText('83.20° E'); // the glide lands exactly
   await page.keyboard.press('KeyW');
   await expect(caption).toContainText('Window centre 7.9 north, 83.2 east');
   await expect(caption).toContainText('Date:');

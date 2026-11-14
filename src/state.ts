@@ -10,6 +10,8 @@ export interface Settings {
   haptics: boolean;
   hapticAccents: boolean;
   tempo: number;
+  /** Navigation speed, window widths per second. */
+  navSpeed: number;
   keyRoot: number; // pitch class, 2 = D
   mono: boolean;
   highContrast: boolean;
@@ -28,6 +30,8 @@ export interface AppState {
   dragging: boolean;
   globeMode: boolean;
   live: string;
+  /** Window mean per active layer, from the last loop regeneration. */
+  means: Partial<Record<LayerId, number>>;
   settings: Settings;
   set: (p: Partial<AppState>) => void;
   setSettings: (p: Partial<Settings>) => void;
@@ -36,7 +40,7 @@ export interface AppState {
 const SETTINGS_KEY = 'fte-settings';
 const defaults: Settings = {
   masterVolume: 0.7, layerDb: {}, speechRate: 1.1, voice: true, haptics: true, hapticAccents: false,
-  tempo: 72, keyRoot: 2, mono: false, highContrast: false,
+  tempo: 72, navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false,
 };
 
 function loadSettings(): Settings {
@@ -60,6 +64,7 @@ export const useApp = create<AppState>((set) => ({
   dragging: false,
   globeMode: false,
   live: '',
+  means: {},
   settings: loadSettings(),
   set: (p) => set(p),
   setSettings: (p) =>
