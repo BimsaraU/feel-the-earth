@@ -1,19 +1,19 @@
 import { gsap } from 'gsap';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { engine } from '../audio/engine';
-import { KEYS, levelWord, norm, VOICES } from '../audio/mapping';
+import { KEYS, levelWord, norm, voiceFor, VOICES } from '../audio/mapping';
 import { placeName, spokenDate, spokenNumber } from '../assist/answers';
 import { say } from '../assist/speech';
 import { runTutorial, skipNarration, stopTutorial } from '../assist/tutorial';
 import {
-  askWhat, askWhere, dateBounds, geo, glideStart, glideStop, moveBy, setDate, setSize, setTravelling, sizeDone, stepDate,
-  toggleLayer, togglePlay, toggleVoice, type Dir,
+  askBeacons, askWhat, askWhere, dateBounds, geo, glideStart, glideStop, moveBy, setDate, setSize, setTravelling, sizeDone, stepDate,
+  showLayer, toggleLayer, togglePlay, toggleVoice, type Dir,
 } from '../controller';
 import type { LayerId } from '../data/types';
 import { haptics } from '../haptics/haptics';
 import { MAX_SIZE, MIN_SIZE, useApp } from '../state';
 import { colour, rampCss } from './colour';
-import { zoomBy } from './Globe';
+import { CONTOUR_LEVELS, zoomBy } from './Globe';
 import { Wheel } from './Wheel';
 
 const DAY = 86400000;
@@ -34,9 +34,10 @@ function PushToTalk() {
     r.lang = 'en-GB';
     r.onresult = (e) => {
       const text = e.results[0][0].transcript.toLowerCase();
-      if (/where/.test(text)) askWhere();
+      if (/peak|valley|high|low|beacon/.test(text)) askBeacons();
+      else if (/where/.test(text)) askWhere();
       else if (/what|hear|listen/.test(text)) void askWhat();
-      else void say('Sorry, ask "where am I" or "what am I hearing".');
+      else void say('Sorry, ask "where am I", "what am I hearing" or "find the peak".');
     };
     r.start();
     rec.current = r;
@@ -61,10 +62,9 @@ function Brand() {
   }, [place]);
   return (
     <header className="brand">
-      <p className="eyebrow">Feel the Earth · NASA EIC data {layers.some((l) => l.demo) && <strong className="demo">DEMO DATA, not NASA data</strong>}</p>
+      <p className="eyebrow">Feel the Earth {layers.some((l) => l.demo) && <strong className="demo">DEMO DATA, not NASA data</strong>}</p>
       <h1 ref={title}>{place}</h1>
-      <p className="coords">{coord(lat, 'N', 'S')} · {coord(lon, 'E', 'W')} · window {Math.round(size * 10) / 10}°</p>
-      <p className="when-line">{spokenDate(date)}{travelling ? ' · time travel' : ''}</p>
+      <p className="coords">{coord(lat, 'N', 'S')} · {coord(lon, 'E', 'W')} · window {Math.round(size * 10) / 10}° · {spokenDate(date)}{travelling ? ' · time travel' : ''}</p>
       <p className="caption" role="status" aria-live="polite">{live}</p>
     </header>
   );
@@ -106,18 +106,55 @@ function Item({ title, children, open, onToggle }: { title: string; children: Re
   );
 }
 
-function Listen() {
-  const playing = useApp((s) => s.playing);
+/** The audio assistant: everything that answers in words, on its own button. */
+function Assistant() {
   const voice = useApp((s) => s.settings.voice);
   return (
-    <div className="buttons">
+    <div className="assistant glass" id="assistant" role="region" aria-label="Audio assistant">
+      <p className="eyebrow">Audio assistant</p>
       <button type="button" onClick={askWhere}>Where am I? <kbd>W</kbd></button>
       <button type="button" onClick={() => void askWhat()}>What am I hearing? <kbd>H</kbd></button>
-      <button type="button" onClick={togglePlay} aria-pressed={playing}>{playing ? 'Pause' : 'Play'} <kbd>Space</kbd></button>
+      <button type="button" onClick={askBeacons}>Find peak and valley <kbd>B</kbd></button>
       <button type="button" onClick={() => void runTutorial()}>Listening tour <kbd>T</kbd></button>
       <button type="button" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>V</kbd></button>
       <PushToTalk />
     </div>
+  );
+}
+
+const short = (v: number) => String(+v.toPrecision(3));
+
+/** Map key: which data the colours on the map are, its scale, and what else is drawn or only heard. */
+function MapKey() {
+  const { layers, active, date } = useApp();
+  const shown = layers.find((x) => x.id === active[active.length - 1]);
+  const heard = active.slice(0, -1).map((id) => layers.find((x) => x.id === id)!).filter(Boolean);
+  const inRecord = shown && date >= shown.timeRange[0] && date <= shown.timeRange[1];
+  return (
+    <section className="mapkey glass" aria-label="Map key">
+      <p className="eyebrow">On the map</p>
+      {shown ? (
+        <>
+          <p className="mapkey-name">{shown.name}</p>
+          <div className="legend" role="img" aria-label={`Colour scale from ${short(shown.min)} to ${short(shown.max)} ${shown.unitSpoken}`}>
+            <span>{short(shown.min)}</span>
+            <span className="ramp" style={{ background: rampCss(shown.id) }} />
+            <span>{short(shown.max)} {shown.unit}</span>
+          </div>
+          <p className="muted small">
+            {inRecord ? `${spokenDate(date)} · ${voiceFor(shown.id).instrument}` : `No data on this date (record ${shown.timeRange[0].slice(0, 4)} to ${shown.timeRange[1].slice(0, 4)})`}
+            {' · '}contour every {short((shown.max - shown.min) / CONTOUR_LEVELS)} {shown.unit}
+          </p>
+        </>
+      ) : <p className="muted small">No data layer. Press 1 to 9 or open the menu.</p>}
+      {heard.length > 0 && (
+        <div className="mapkey-heard">
+          <p className="eyebrow">Heard, not drawn</p>
+          {heard.map((l) => <button key={l.id} type="button" onClick={() => showLayer(l.id)} aria-label={`Draw ${l.name} on the map`}>{l.name}</button>)}
+        </div>
+      )}
+      <p className="mapkey-marks muted small"><span className="mk-window" aria-hidden="true" /> listening window <span className="mk-scan" aria-hidden="true" /> scan line</p>
+    </section>
   );
 }
 
@@ -171,7 +208,6 @@ function Layers() {
           </div>
         );
       })}
-      <Legend />
     </div>
   );
 }
@@ -187,20 +223,6 @@ function Counter({ value }: { value: number }) {
     gsap.to(shown.current, { v: value, duration: 0.8, ease: 'power2.out', onUpdate: () => { if (el.current) el.current.textContent = spokenNumber(shown.current.v).replace('minus ', '−'); } });
   }, [value]);
   return <span ref={el} />;
-}
-
-function Legend() {
-  const { layers, active } = useApp();
-  const l = layers.find((x) => x.id === active[active.length - 1]);
-  if (!l) return null;
-  return (
-    <div className="legend" aria-label={`Colour scale for ${l.name}, ${l.min} to ${l.max} ${l.unitSpoken}`}>
-      <span>{l.min}</span>
-      <span className="ramp" style={{ background: rampCss(l.id) }} />
-      <span>{l.max} {l.unit}</span>
-      <span className="hatch" aria-hidden="true" /><span>no data</span>
-    </div>
-  );
 }
 
 function Time() {
@@ -304,6 +326,7 @@ function Settings() {
       </label>
       <label className="check"><input type="checkbox" checked={s.mono} onChange={(e) => setSettings({ mono: e.target.checked })} /> Mono mix</label>
       <label className="check"><input type="checkbox" checked={s.spatial} onChange={(e) => setSettings({ spatial: e.target.checked })} /> Surround field (headphones)</label>
+      <label className="check"><input type="checkbox" checked={s.probe} onChange={(e) => setSettings({ probe: e.target.checked })} /> Terrain probe and beacons while moving</label>
       <label className="check"><input type="checkbox" checked={s.highContrast} onChange={(e) => setSettings({ highContrast: e.target.checked })} /> High contrast</label>
     </div>
   );
@@ -319,16 +342,18 @@ function About() {
   );
 }
 
-const ITEMS = ['Listen', 'Layers', 'Time', 'Window', 'Settings', 'About the data'] as const;
+const ITEMS = ['Layers', 'Time', 'Window', 'Settings', 'About the data'] as const;
 
 export function Controls() {
-  const [open, setOpen] = useState(false);
+  const [panel, setPanel] = useState<'menu' | 'assistant' | null>(null);
+  const open = panel === 'menu';
+  const playing = useApp((s) => s.playing);
   const [item, setItem] = useState<(typeof ITEMS)[number] | null>('Layers');
   const bar = useRef<HTMLElement>(null);
   const hud = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (hud.current) gsap.from(hud.current.querySelectorAll('.brand, .menu-button'), { opacity: 0, y: 18, filter: 'blur(8px)', duration: 0.9, stagger: 0.1, ease: 'power3.out', clearProps: 'opacity,filter,transform' });
+    if (hud.current) gsap.from(hud.current.querySelectorAll('.brand, .bar, .mapkey'), { opacity: 0, y: 18, filter: 'blur(8px)', duration: 0.9, stagger: 0.1, ease: 'power3.out', clearProps: 'opacity,filter,transform' });
   }, []);
   useLayoutEffect(() => {
     if (!bar.current) return;
@@ -336,21 +361,31 @@ export function Controls() {
     if (open) bar.current.querySelector<HTMLElement>('.item-head')?.focus();
   }, [open]);
   useEffect(() => {
-    const toggle = () => setOpen((o) => !o);
-    window.addEventListener('fte-menu', toggle);
-    return () => window.removeEventListener('fte-menu', toggle);
+    const menu = () => setPanel((p) => (p === 'menu' ? null : 'menu'));
+    const assistant = () => setPanel((p) => (p === 'assistant' ? null : 'assistant'));
+    window.addEventListener('fte-menu', menu);
+    window.addEventListener('fte-assistant', assistant);
+    return () => { window.removeEventListener('fte-menu', menu); window.removeEventListener('fte-assistant', assistant); };
   }, []);
 
   const body: Record<(typeof ITEMS)[number], ReactNode> = {
-    Listen: <Listen />, Layers: <Layers />, Time: <Time />, Window: <WindowControls />, Settings: <Settings />, 'About the data': <About />,
+    Layers: <Layers />, Time: <Time />, Window: <WindowControls />, Settings: <Settings />, 'About the data': <About />,
   };
   return (
     <div className="hud" ref={hud}>
       <Brand />
       <TourCard />
-      <button type="button" className="menu-button glass" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(!open)}>
-        {open ? 'Close' : 'Menu'} <kbd>M</kbd>
-      </button>
+      <MapKey />
+      <nav className="bar" aria-label="Main">
+        <button type="button" className="glass" onClick={togglePlay} aria-pressed={playing}>{playing ? 'Pause' : 'Play'} <kbd>Space</kbd></button>
+        <button type="button" className="glass" aria-expanded={panel === 'assistant'} aria-controls="assistant" onClick={() => setPanel(panel === 'assistant' ? null : 'assistant')}>
+          Assistant <kbd>A</kbd>
+        </button>
+        <button type="button" className="glass" aria-expanded={open} aria-controls="sidebar" onClick={() => setPanel(open ? null : 'menu')}>
+          {open ? 'Close' : 'Menu'} <kbd>M</kbd>
+        </button>
+      </nav>
+      {panel === 'assistant' && <Assistant />}
       <aside id="sidebar" ref={bar} className="sidebar glass" aria-label="Menu" style={{ visibility: 'hidden' }}>
         {ITEMS.map((t) => (
           <Item key={t} title={t} open={item === t} onToggle={() => setItem(item === t ? null : t)}>{body[t]}</Item>

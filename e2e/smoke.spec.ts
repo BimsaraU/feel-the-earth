@@ -26,17 +26,17 @@ test('load, unlock audio, move, toggle a layer, ask both questions, time travel'
 
   await page.keyboard.press('KeyH');
   await expect(caption).toContainText('Lightning,');
-  await expect(caption).toContainText('Sea surface temperature: no data in this window.');
+  await expect(caption).toContainText('Sea surface temperature: no data in this window');
 
   await page.keyboard.press('KeyY');
   await expect(caption).toContainText('Time travel on: a day per bar.');
 
   await page.keyboard.press('KeyT');
   const tour = page.getByRole('region', { name: 'Listening tour' });
-  await expect(tour).toContainText('1 of 19');
+  await expect(tour).toContainText('1 of 18');
   await expect(caption).toContainText('Welcome to the listening tour.');
   await page.getByRole('button', { name: 'Skip' }).click();
-  await expect(tour).toContainText('2 of 19', { timeout: 10_000 });
+  await expect(tour).toContainText('2 of 18', { timeout: 10_000 });
   await page.keyboard.press('Escape');
   await expect(tour).toHaveCount(0);
 

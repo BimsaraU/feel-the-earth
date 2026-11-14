@@ -2,6 +2,7 @@ import * as Tone from 'tone';
 import type { LayerId, LayerInfo, WindowData } from '../data/types';
 import { fx } from '../fx';
 import { Field } from './field';
+import { Terrain } from './terrain';
 import { chordAt, type Mood } from './harmony';
 import { buildPattern, scanPan, STEPS, type Pattern, type Step } from './loop';
 import { scaleNotes, VOICES, type Instrument, type VoiceMapping } from './mapping';
@@ -70,7 +71,7 @@ export class Voice {
     this.texture?.gain.rampTo(this.enabled && p.textureDb > -Infinity ? Tone.dbToGain(p.textureDb + this.userDb) : 0, Math.max(ramp, 0.3), time);
   }
 
-  /** Queue a new loop from window data. It swaps in at the next bar line. */
+  /** Queue a new loop from window data. It swaps in on the next beat. */
   render(win: WindowData, layer: LayerInfo) {
     this.pending = this.build(win, layer);
     if (!this.current) this.swap(Tone.now());
@@ -119,7 +120,7 @@ export class Voice {
 
   /** Called by the transport on every beat. Returns the step played, for accents. */
   playStep(i: number, time: number, stepSec: number): Step | null {
-    if (i % 4 === 0 && this.pending) this.swap(time);
+    if (this.pending) this.swap(time); // any beat: the notes follow the window while it moves
     const p = this.patterns[this.active];
     if (!this.enabled || !p) return null;
     const step = p.steps[i];
@@ -183,8 +184,10 @@ class AudioEngine {
   /** Called on every bar line, in step with the audio (time travel). */
   onBar: (() => void) | null = null;
   firstLayer: LayerId | null = null;
-  /** Surround field around the window (HRTF + doppler). */
+  /** Surround field around the window (HRTF, level and position only). */
   field: Field | null = null;
+  /** Terrain probe: contour steps, slope pull and peak/valley beacons while the window moves. */
+  terrain: Terrain | null = null;
 
   private shots: Buffers = {};
   private reversed: Buffers = {};
@@ -199,10 +202,15 @@ class AudioEngine {
   /** Motion cue on the whole mix: balance leans towards east/west travel, a high shelf brightens north, darkens south. */
   private motionPan!: Tone.Panner;
   private motionTilt!: Tone.Filter;
+  /** While moving, part of the mix is sent through an HRTF panner placed in the direction of travel (front/back too). */
+  private motion3d!: Tone.Panner3D;
+  private motionDry!: Tone.Gain;
+  private motionWet!: Tone.Gain;
   private manyTimer = 0;
   private beds: Record<string, Tone.Gain> = {};
   private drone: Tone.Sampler | null = null;
   private speaking = false;
+  private probing = false;
   private eventUntil = 0;
 
   /** Must be called synchronously inside the first user gesture. */
@@ -239,10 +247,16 @@ class AudioEngine {
     this.duck = new Tone.Gain(1);
     this.motionPan = new Tone.Panner(0);
     this.motionTilt = new Tone.Filter({ type: 'highshelf', frequency: 2500, gain: 0 });
-    this.stack.chain(this.duck, this.motionTilt, this.motionPan, master);
+    this.motion3d = new Tone.Panner3D({ panningModel: 'HRTF', distanceModel: 'linear', rolloffFactor: 0, positionZ: -1 });
+    this.motionDry = new Tone.Gain(1);
+    this.motionWet = new Tone.Gain(0);
+    this.stack.chain(this.duck, this.motionTilt);
+    this.motionTilt.chain(this.motionPan, this.motionDry, master);
+    this.motionTilt.chain(this.motion3d, this.motionWet, master);
     this.events = new Tone.Gain(Tone.dbToGain(-4)).connect(master);
     this.narration = new Tone.Gain(1).connect(master);
     this.field = new Field(this.duck, () => this.keyRoot);
+    this.terrain = new Terrain(new Tone.Gain(Tone.dbToGain(-3)).connect(master), () => this.keyRoot);
 
     this.shots = await load(manifest.oneshots);
     for (const name of ['clave', 'framedrum', 'smallbell', 'gong', 'cymbal', 'ratchet', 'thump', 'singingbowl', 'wave', 'whoosh', 'windchime']) {
@@ -268,10 +282,9 @@ class AudioEngine {
       this.drone.chain(new Tone.Filter(1200, 'lowpass'), new Tone.Gain(Tone.dbToGain(-6)), this.stack);
     } else this.missing.push('instrument cellotrem');
 
-    // Ambience beds: sea, warm land (breeze and birds), chilly land (mountain wind). Kept very quiet.
+    // Ambience beds: sea wash for water, mountain wind only for high land (recordings). Kept very quiet.
     for (const [name, filter] of [
       ['oceanbed', new Tone.Filter(1400, 'lowpass')],
-      ['landbed', new Tone.Filter(3500, 'lowpass')],
       ['windbed', new Tone.Filter(600, 'highpass')],
     ] as const) {
       const buf = this.shots[name];
@@ -281,6 +294,12 @@ class AudioEngine {
       new Tone.Player({ url: buf, loop: true, loopStart: 0.06, loopEnd: buf.duration - 0.06 }).chain(filter, g, this.duck).start();
       this.beds[name] = g;
     }
+    // Earth bed for land: a deep, warm ground rumble (brown noise below 180 Hz) with a faint soil grain around 420 Hz.
+    // ponytail: synthesized, levels set by ear; swap in a recorded soil/forest-floor bed under the same gain if found.
+    const earth = new Tone.Gain(0).connect(this.duck);
+    new Tone.Noise('brown').chain(new Tone.Filter(180, 'lowpass'), new Tone.Gain(2.5), earth).start();
+    new Tone.Noise('pink').chain(new Tone.Filter({ type: 'bandpass', frequency: 420, Q: 0.8 }), new Tone.Gain(0.1), earth).start();
+    this.beds.earthbed = earth;
 
     // Window-moving whoosh: a looping field-recording slice, level follows drag speed.
     this.whooshPan = new Tone.Panner(0).connect(this.events);
@@ -401,6 +420,13 @@ class AudioEngine {
     setTimeout(() => this.applyDuck(), Math.min(sec, 1.5) * 1000 + 30);
   }
 
+  /** While the window moves the music steps back 5 dB so the terrain probe reads clearly. */
+  setProbing(on: boolean) {
+    if (this.probing === on) return;
+    this.probing = on;
+    this.applyDuck();
+  }
+
   duckSpeech(on: boolean) {
     this.speaking = on;
     this.applyDuck();
@@ -408,8 +434,8 @@ class AudioEngine {
 
   private applyDuck() {
     if (!this.duck) return;
-    const db = this.speaking ? -9 : Tone.immediate() < this.eventUntil ? -1.5 : 0;
-    this.duck.gain.rampTo(Tone.dbToGain(db), 0.05);
+    const db = this.speaking ? -9 : this.probing ? -5 : Tone.immediate() < this.eventUntil ? -1.5 : 0;
+    this.duck.gain.rampTo(Tone.dbToGain(db), this.probing ? 0.2 : 0.05);
   }
 
   /** Many borders: one continuous, soft clave patter instead of single ticks. Runs even while the loop is paused. */
@@ -422,16 +448,29 @@ class AudioEngine {
   }
 
   /**
-   * Which way the window is travelling, in window widths per second (east, north). The mix leans into the direction
-   * of travel (left/right balance, up to 60 %) and tilts brighter going north, darker going south (up to 4 dB above
-   * 2.5 kHz); the whoosh pans further. Long ramps keep it smooth. ponytail: tanh(1.5 v) curve tuned by ear.
+   * Which way the window is travelling, in window widths per second (east, north). Heard three ways, all blended in
+   * only while moving and eased over half a second:
+   *  - left/right: the stereo balance leans into east/west travel (up to 50 %), the whoosh further;
+   *  - ahead/behind: up to half the mix (equal power) moves into an HRTF panner placed in the direction of travel,
+   *    north = in front, south = behind, so headphones give a front/back image as well as left/right;
+   *  - a 2.5 kHz shelf tilts brighter going north, darker going south (up to 3 dB).
+   * At rest the mix is the plain stereo mix. ponytail: tanh curves tuned by reasoning, adjust by ear.
    */
   setMotion(east: number, north: number) {
     if (!this.motionPan) return;
-    const pan = 0.6 * Math.tanh(1.5 * east);
-    this.motionPan.pan.linearRampTo(pan, 0.35);
-    this.whooshPan.pan.linearRampTo(Math.max(-1, Math.min(1, pan * 1.5)), 0.25);
-    this.motionTilt.gain.linearRampTo(4 * Math.tanh(1.5 * north), 0.35); // linear: dB crosses zero
+    const T = 0.5, now = Tone.now();
+    const speed = Math.hypot(east, north);
+    const m = 0.5 * Math.tanh(1.2 * speed); // share of the mix that moves into the 3D panner
+    this.motionDry.gain.linearRampTo(Math.cos((m * Math.PI) / 2), T);
+    this.motionWet.gain.linearRampTo(Math.sin((m * Math.PI) / 2), T);
+    if (speed > 1e-3) {
+      this.motion3d.positionX.linearRampToValueAtTime(east / speed, now + T);
+      this.motion3d.positionZ.linearRampToValueAtTime(-north / speed, now + T);
+    }
+    const pan = 0.5 * Math.tanh(1.5 * east);
+    this.motionPan.pan.linearRampTo(pan, T);
+    this.whooshPan.pan.linearRampTo(Math.max(-1, Math.min(1, pan * 1.6)), T * 0.6);
+    this.motionTilt.gain.linearRampTo(3 * Math.tanh(1.5 * north), T); // linear: dB crosses zero
   }
 
   setMoveSpeed(degPerSec: number) {
@@ -439,15 +478,15 @@ class AudioEngine {
   }
 
   /**
-   * landShare 0 = all water, 1 = all land; chill 0 = lowland (warm), 1 = high mountains (chilly).
-   * Equal-power mixes: sea vs land, then warm vs chilly land.
+   * landShare 0 = all water, 1 = all land; height 0 = lowland, 1 = high mountains.
+   * Equal-power mixes: sea vs earth; wind joins the earth only with height. Slow ramps so crossings blend.
    */
-  setSurface(landShare: number, chill: number) {
-    const bed = Tone.dbToGain(-20);
+  setSurface(landShare: number, height: number) {
+    const bed = Tone.dbToGain(-20), T = 0.8;
     const land = Math.sin((landShare * Math.PI) / 2);
-    this.beds.oceanbed?.gain.rampTo(bed * Math.cos((landShare * Math.PI) / 2), 0.25);
-    this.beds.landbed?.gain.rampTo(bed * land * Math.cos((chill * Math.PI) / 2), 0.4);
-    this.beds.windbed?.gain.rampTo(bed * 0.8 * land * Math.sin((chill * Math.PI) / 2), 0.4);
+    this.beds.oceanbed?.gain.linearRampTo(bed * Math.cos((landShare * Math.PI) / 2), T);
+    this.beds.earthbed?.gain.linearRampTo(bed * land * (1 - 0.4 * height), T);
+    this.beds.windbed?.gain.linearRampTo(bed * 0.9 * land * Math.sin((height * Math.PI) / 2), T);
   }
 
   /** Position of the scan line in the loop, 0..1 (west to east). */
@@ -455,6 +494,9 @@ class AudioEngine {
     const t = Tone.getTransport();
     return ((t.ticks / t.PPQ) % STEPS) / STEPS;
   }
+
+  /** Dial detent: a tiny dry click per step, higher going up. Never ducks the music. */
+  detent(up: boolean) { this.play('clave', { rate: up ? 2.5 : 2.1, db: -24, lowpass: 5000, music: true }); }
 
   setMasterVolume(v: number) { this.volume?.gain.rampTo(v, 0.1); }
 

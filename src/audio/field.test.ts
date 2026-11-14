@@ -1,16 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Halo } from '../state';
-import { dopplerRatio, haloMean } from './field';
+import { haloMean } from './field';
 
 describe('surround field', () => {
-  it('doppler rises approaching, falls receding, stays clamped', () => {
-    expect(dopplerRatio(0, 6)).toBe(1);
-    expect(dopplerRatio(1, 6)).toBeCloseTo(7 / 6);
-    expect(dopplerRatio(-1, 6)).toBeCloseTo(5 / 6);
-    expect(dopplerRatio(100, 6)).toBeCloseTo(1.26);
-    expect(dopplerRatio(-100, 6)).toBeCloseTo(1 / 1.26);
-  });
-
   it('halo mean reads the right cells, ignores NaN, wraps longitude', () => {
     // 4 x 4 over lat -20..20, lon 170..210 (crosses the antimeridian); value = column index, row 0 NaN.
     const n = 4, grid = new Float32Array(n * n);

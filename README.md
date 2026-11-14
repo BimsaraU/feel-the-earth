@@ -31,6 +31,8 @@ Assets are committed. To rebuild them (needs network):
 | 1 to 4 | Toggle layers |
 | , and . / Shift+, and . | Day / month back and forward |
 | W / H | Where am I? / What am I hearing? |
+| B | Find peak and valley: where the highest and lowest values nearby are (their beacons ping) |
+| A | Audio assistant panel |
 | G | Arrows turn the globe instead |
 | T | Listening tour: narrated guide to every sound and why it sounds that way (Esc ends it) |
 | V | Voice guide on / off (spoken help; captions stay) |

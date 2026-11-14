@@ -101,12 +101,18 @@ export const FEATURES = [
   { feature: 'Window mean', sound: 'Character filters per layer (see table): e.g. cold air thin and icy, CO2 darker and growling, PM2.5 muffled.' },
   { feature: 'East-west position', sound: 'Stereo follows the scan from left to right.' },
   { feature: 'Land and water share', sound: 'Ambience: soft sea wash for water, land sounds for land, mixed by share.' },
-  { feature: 'Land elevation', sound: 'Land ambience: low land is warm (breeze and birds, darker), high land chilly (mountain wind, thinner).' },
+  { feature: 'Land elevation', sound: 'Land ambience: a deep, warm earth rumble; mountain wind joins only above about 600 m and grows to 3,000 m.' },
   { feature: 'No data', sound: 'That layer is silent on that beat (no stand-in sound).' },
   { feature: 'Direction of travel', sound: 'While the window moves the whole mix leans left or right with east-west travel and gets brighter going north, darker going south; the whoosh pans with it.' },
+  { feature: 'Value under the window centre, while moving (terrain probe)', sound: 'A held tone on a 16-rung pentatonic ladder, height 40 % from the layer range and 60 % from the range of the neighbourhood. Each rung crossed is re-struck with a haptic tick: uphill is a rising run, downhill a falling one. The music steps back 5 dB while you move.' },
+  { feature: 'Slope at the centre', sound: 'The probe tone sits in the uphill direction (HRTF: north ahead, east right), further out the steeper the slope, and brightens with the rate of change.' },
+  { feature: 'Highest and lowest value within 1.25 window widths', sound: 'Beacons at their true bearing: peak = two rising high notes, valley = two falling low notes; pings get faster and louder as you approach. B speaks where they are.' },
 ];
 
 export const EVENT_SOUNDS = [
+  { event: 'Peak reached', sound: 'Bright bell, value spoken.', sample: 'smallbell' },
+  { event: 'Valley reached', sound: 'Deep muffled drum, value spoken.', sample: 'framedrum' },
+  { event: 'Dial step / end stop', sound: 'Dry click per step, higher going up; dull thud at the end of the range.', sample: 'clave' },
   { event: 'Border crossed', sound: 'Two faint wooden ticks, the second higher.', sample: 'clave' },
   { event: 'Many borders per second', sound: 'Faint continuous wooden patter.', sample: 'clave' },
   { event: 'Coast, into sea', sound: 'Faint wave wash.', sample: 'wave' },

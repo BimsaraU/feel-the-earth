@@ -14,8 +14,10 @@ export interface Settings {
   keyRoot: number; // pitch class, 2 = D
   mono: boolean;
   highContrast: boolean;
-  /** Surround field: data around the window as 3D (HRTF) sources with doppler while moving. */
+  /** Surround field: data around the window as 3D (HRTF) sources that move round you as you travel. */
   spatial: boolean;
+  /** Terrain probe: contour steps, slope pull and peak/valley beacons while the window moves. */
+  probe: boolean;
 }
 
 /** The data map around the window, HALO times its size, sampled for every active layer. Feeds the 3D view and the surround field. */
@@ -50,7 +52,7 @@ export interface AppState {
 const SETTINGS_KEY = 'fte-settings';
 const defaults: Settings = {
   masterVolume: 0.7, layerDb: {}, speechRate: 1.1, voice: true, haptics: true, hapticAccents: false,
-  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true,
+  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true,
 };
 
 function loadSettings(): Settings {

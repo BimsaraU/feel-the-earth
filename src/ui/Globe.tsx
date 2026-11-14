@@ -1,6 +1,6 @@
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, ImageSource, StyleSpecification } from 'maplibre-gl';
-import type { Feature, FeatureCollection, LineString, Point, Polygon } from 'geojson';
+import type { Feature, LineString, Point, Polygon } from 'geojson';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
@@ -8,10 +8,10 @@ import { engine } from '../audio/engine';
 import { norm } from '../audio/mapping';
 import { dragEnd, dragStart, isGliding, setCenter, setSize, sizeDone } from '../controller';
 import { source } from '../data';
-import type { LayerId } from '../data/types';
-import { useApp, type Halo } from '../state';
+import type { BBox, LayerId, LayerInfo } from '../data/types';
+import { useApp } from '../state';
 import { colour } from './colour';
-import { createFx, HUE } from './fxLayer';
+import { createFx } from './fxLayer';
 
 maplibregl.setWorkerUrl(workerUrl); // bundled app: tell MapLibre where its worker file landed
 
@@ -24,8 +24,12 @@ const HALVES = [
 const coords = (w: number, e: number): [[number, number], [number, number], [number, number], [number, number]] =>
   [[w, MAX_MERC], [e, MAX_MERC], [e, -MAX_MERC], [w, -MAX_MERC]];
 const BLANK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-const wrap = (d: number) => ((d + 540) % 360) - 180;
 const MINT = '#9ef2c9';
+const MIN_ZOOM = 0, MAX_ZOOM = 8;
+const GIBS = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
+/** Zoom at which the whole planet fits the container with space around it. */
+const fitZoom = (el: HTMLElement, lat: number) =>
+  Math.log2((0.74 * Math.min(el.clientWidth, el.clientHeight) * Math.PI * Math.cos((lat * Math.PI) / 180)) / 512);
 
 export function windowOutline(lat: number, lon: number, size: number): Feature<Polygon> {
   const h = size / 2, n = Math.min(90, lat + h), s = Math.max(-90, lat - h), w = lon - h, e = lon + h;
@@ -44,75 +48,131 @@ const point = (lat: number, lon: number): Feature<Point> => ({ type: 'Feature', 
 
 const MERC_Y_MAX = Math.log(Math.tan(Math.PI / 4 + (MAX_MERC * Math.PI) / 360));
 
-/** Data overlay as two Web Mercator images: each canvas row is sampled at its Mercator latitude. */
-async function drawOverlay(map: maplibregl.Map, layerId: LayerId | undefined, date: string) {
-  const layer = useApp.getState().layers.find((l) => l.id === layerId);
-  const n = 360; // half a degree per pixel; the raster layer interpolates linearly between them
-  for (const h of HALVES) {
-    const src = map.getSource(h.id) as ImageSource | undefined;
-    if (!src) continue;
-    if (!layer) { src.updateImage({ url: BLANK, coordinates: coords(h.west, h.east) }); continue; }
-    const win = await source.getWindow(layer.id, { west: h.west, east: h.east, south: -MAX_MERC, north: MAX_MERC }, date, n);
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = n;
-    const ctx = canvas.getContext('2d')!;
-    const img = ctx.createImageData(n, n);
-    for (let y = 0; y < n; y++) {
-      const lat = (Math.atan(Math.sinh(MERC_Y_MAX * (1 - (2 * (y + 0.5)) / n))) * 180) / Math.PI;
-      const row = Math.min(n - 1, Math.max(0, Math.floor(((MAX_MERC - lat) / (2 * MAX_MERC)) * n)));
-      for (let x = 0; x < n; x++) {
-        const t = norm(win.grid[row * n + x], layer);
-        const [r, g, b, a] = Number.isNaN(t) ? [0, 0, 0, 0] : [...colour(t, layer.id), 255]; // no data: just the Earth
-        img.data.set([r, g, b, a], (y * n + x) * 4);
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    src.updateImage({ url: canvas.toDataURL(), coordinates: coords(h.west, h.east) });
-  }
-}
+/** Layers whose values vary smoothly get contour lines; point-like layers (lightning, lights) would only get noise. */
+const CONTOURED = new Set<LayerId>(['sst', 'airtemp', 'co2', 'precip', 'ndvi', 'aerosol']);
+export const CONTOUR_LEVELS = 16;
+/** Above this zoom a second, screen-resolution patch of the heatmap is drawn over the visible area. */
+const DETAIL_ZOOM = 2.5;
 
-const hex2 = (n: number) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, '0');
-const box = (w: number, s: number, e: number, n: number): Polygon => ({ type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] });
+const mercY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+const invMerc = (y: number) => (Math.atan(Math.sinh(y)) * 180) / Math.PI;
+/** Catmull-Rom weights for the four samples around fraction f. */
+const cr = (f: number) => [((-f + 2) * f - 1) * f / 2, ((3 * f - 5) * f * f + 2) / 2, ((-3 * f + 4) * f + 1) * f / 2, (f - 1) * f * f / 2];
 
 /**
- * Data around the window as 3D blocks on the real globe. Every block is one cell of the halo map with its exact
- * geographic bounds. Each active layer floats on its own translucent plate, stacked upwards in switch-on order; block
- * height follows the value (signed layers rise above the plate for gains and hang below it for losses).
- * Heights scale with the window so the stack keeps its proportions at every size.
+ * Paint one layer over a lat/lon box as a W x H Web Mercator image, as sharply as the data allows:
+ * the data is read at its own resolution and bicubically (Catmull-Rom) interpolated to every pixel; relief shading
+ * from the local gradient (light from the north-west) and a one-pixel contour line at every 1/16 of the layer range
+ * turn fronts, ridges and basins into crisp shapes. Edges of the data fade over half a cell; no data is transparent.
  */
-export function holoFeatures(h: Halo | null): FeatureCollection {
-  const feats: Feature[] = [];
-  const st = useApp.getState();
-  if (!h) return { type: 'FeatureCollection', features: feats };
-  const span = h.size * 111_000; // window width in metres
-  const G = span * 0.014, H = span * 0.012; // plate spacing, full-range block height: kept subtle
-  const { box: b, n } = h;
-  const dLat = (b.north - b.south) / n, dLon = (b.east - b.west) / n, gap = 0.04;
-  st.active.forEach((id, k) => {
-    const layer = st.layers.find((l) => l.id === id), grid = h.grids[id];
-    if (!layer || !grid) return;
-    const plate = G * (k + 1);
-    const tint = HUE[id] ?? MINT;
-    const signed = layer.min < 0 && -layer.min >= 0.25 * layer.max;
-    const t0 = signed ? norm(0, layer) : 0;
-    feats.push({ type: 'Feature', properties: { kind: 'plate', c: tint, b: plate - G * 0.015, h: plate }, geometry: box(b.west, b.south, b.east, b.north) });
-    // Local contrast: 35 % absolute value + 65 % stretched over this neighbourhood, so the colour range shows local
-    // structure (e.g. 26 vs 29 °C) instead of one flat hue. The globe overlay and the legend stay absolute.
-    let lo = 1, hi = 0;
-    for (const v of grid) { const t = norm(v, layer); if (t < lo) lo = t; if (t > hi) hi = t; }
-    const local = (t: number) => (signed ? t : 0.35 * t + 0.65 * ((t - lo) / Math.max(0.04, hi - lo)));
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-      const t = norm(grid[r * n + c], layer);
-      if (Number.isNaN(t)) continue;
-      const tl = local(t);
-      const top = plate + (signed ? (t - t0) * H * 1.6 : Math.max(0.03, tl) * H);
-      const col = '#' + colour(tl, id).map(hex2).join('');
-      const n0 = b.north - r * dLat, w0 = b.west + c * dLon;
-      feats.push({ type: 'Feature', properties: { kind: 'cell', c: col, b: Math.min(plate, top), h: Math.max(plate, top) },
-        geometry: box(w0 + gap * dLon, n0 - (1 - gap) * dLat, w0 + (1 - gap) * dLon, n0 - gap * dLat) });
+async function paint(layer: LayerInfo, date: string, box: BBox, W: number, H: number): Promise<Blob | null> {
+  const n = Math.max(8, Math.min(720, Math.ceil(Math.max(box.east - box.west, box.north - box.south) / layer.resolutionDeg)));
+  const g = (await source.getWindow(layer.id, box, date, n)).grid;
+  const at = (r: number, c: number) => g[Math.max(0, Math.min(n - 1, r)) * n + Math.max(0, Math.min(n - 1, c))];
+  const c0 = new Int32Array(W), fx = new Float32Array(W), wx = new Float32Array(W * 4);
+  for (let x = 0; x < W; x++) {
+    const fc = ((x + 0.5) / W) * n - 0.5;
+    c0[x] = Math.floor(fc); fx[x] = fc - c0[x]; wx.set(cr(fx[x]), x * 4);
+  }
+  // 1. Normalised value and coverage per pixel.
+  const T = new Float32Array(W * H), A = new Uint8Array(W * H);
+  const yN = mercY(box.north), yS = mercY(box.south);
+  for (let y = 0; y < H; y++) {
+    const lat = invMerc(yN + ((yS - yN) * (y + 0.5)) / H);
+    const fr = ((box.north - lat) / (box.north - box.south)) * n - 0.5, r0 = Math.floor(fr), fy = fr - r0, wy = cr(fy);
+    for (let x = 0; x < W; x++) {
+      const c = c0[x];
+      let v = 0, ok = true;
+      for (let j = 0; j < 4 && ok; j++) for (let i = 0; i < 4; i++) {
+        const s = at(r0 - 1 + j, c - 1 + i);
+        if (Number.isNaN(s)) { ok = false; break; }
+        v += s * wy[j] * wx[x * 4 + i];
+      }
+      let a = 1;
+      if (!ok) { // next to missing data: still bicubic, missing samples stand in as the local mean; fade out over the last cell
+        let sum = 0, k = 0, w = 0;
+        for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
+          const s = at(r0 + j, c + i);
+          if (!Number.isNaN(s)) { sum += s; k++; w += (j ? fy : 1 - fy) * (i ? fx[x] : 1 - fx[x]); }
+        }
+        v = k ? 0 : NaN;
+        for (let j = 0; j < 4 && k; j++) for (let i = 0; i < 4; i++) {
+          const s = at(r0 - 1 + j, c - 1 + i);
+          v += (Number.isNaN(s) ? sum / k : s) * wy[j] * wx[x * 4 + i];
+        }
+        a = Math.max(0, Math.min(1, (w - 0.15) / 0.7));
+      }
+      T[y * W + x] = norm(v, layer);
+      A[y * W + x] = Number.isNaN(v) ? 0 : 255 * a;
     }
-  });
-  return { type: 'FeatureCollection', features: feats };
+  }
+  // 2. Colour, relief shading, contour lines.
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(W, H), px = img.data;
+  const lines = CONTOURED.has(layer.id);
+  const k = 3.5 / ((box.east - box.west) / W); // shading strength per unit of (range per degree)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, t = T[i];
+    if (!A[i]) continue;
+    const e = x < W - 1 && A[i + 1] ? T[i + 1] : t, s = y < H - 1 && A[i + W] ? T[i + W] : t;
+    const shade = Math.max(0.7, Math.min(1.3, 1 + k * (e - t + s - t)));
+    const lv = Math.floor(t * CONTOUR_LEVELS);
+    const edge = lines && (Math.floor(e * CONTOUR_LEVELS) !== lv || Math.floor(s * CONTOUR_LEVELS) !== lv);
+    const c = colour(t, layer.id);
+    for (let q = 0; q < 3; q++) px[i * 4 + q] = edge ? c[q] + (255 - c[q]) * 0.5 : Math.min(255, c[q] * shade);
+    px[i * 4 + 3] = A[i];
+  }
+  ctx.putImageData(img, 0, 0);
+  return new Promise((res) => canvas.toBlob(res));
+}
+
+const urls: Record<string, string> = {};
+function show(map: maplibregl.Map, id: string, blob: Blob | null, quad: ReturnType<typeof coords>) {
+  const src = map.getSource(id) as ImageSource | undefined;
+  if (!src) return;
+  const old = urls[id];
+  urls[id] = blob ? URL.createObjectURL(blob) : '';
+  src.updateImage({ url: urls[id] || BLANK, coordinates: quad });
+  if (old) setTimeout(() => URL.revokeObjectURL(old), 5000);
+}
+
+const topLayer = () => { const st = useApp.getState(); return st.layers.find((l) => l.id === st.active[st.active.length - 1]); };
+
+/** The whole world, four pixels per data cell: what you see with the planet in view. */
+let overlaySeq = 0;
+async function drawOverlay(map: maplibregl.Map) {
+  const seq = ++overlaySeq, layer = topLayer(), date = useApp.getState().date;
+  for (const h of HALVES) {
+    const N = layer ? Math.min(1440, Math.round(720 / layer.resolutionDeg)) : 0;
+    const blob = layer ? await paint(layer, date, { west: h.west, east: h.east, south: -MAX_MERC, north: MAX_MERC }, N, N) : null;
+    if (seq !== overlaySeq) return;
+    show(map, h.id, blob, coords(h.west, h.east));
+  }
+  void drawDetail(map);
+}
+
+/**
+ * Zoomed in: the visible area again at screen resolution (one image pixel per screen pixel), so gradients stay
+ * smooth and contour lines stay hair-thin at any zoom. Redrawn when the view settles.
+ * ponytail: the patch stops at the antimeridian (the world image shows beyond it); split it in two if that matters.
+ */
+let detailSeq = 0;
+async function drawDetail(map: maplibregl.Map) {
+  const seq = ++detailSeq, layer = topLayer(), z = map.getZoom(), el = map.getContainer();
+  const blank = coords(-1, 1);
+  if (!layer || z < DETAIL_ZOOM) { show(map, 'ovD', null, blank); return; }
+  const c = map.getCenter(), lng = ((c.lng + 540) % 360) - 180, pad = 1.5, k = pad / (512 * 2 ** z);
+  const halfLon = 180 * el.clientWidth * k, halfY = Math.PI * el.clientHeight * k;
+  const box = { west: Math.max(-180, lng - halfLon), east: Math.min(180, lng + halfLon),
+    north: Math.min(MAX_MERC, invMerc(mercY(c.lat) + halfY)), south: Math.max(-MAX_MERC, invMerc(mercY(c.lat) - halfY)) };
+  const W = Math.min(2048, Math.round((el.clientWidth * pad * (box.east - box.west)) / (2 * halfLon)));
+  const H = Math.min(2048, Math.round((el.clientHeight * pad * (mercY(box.north) - mercY(box.south))) / (2 * halfY)));
+  if (W < 8 || H < 8) { show(map, 'ovD', null, blank); return; }
+  const blob = await paint(layer, useApp.getState().date, box, W, H);
+  if (seq !== detailSeq) return;
+  show(map, 'ovD', blob, [[box.west, box.north], [box.east, box.north], [box.east, box.south], [box.west, box.south]]);
 }
 
 let mapRef: maplibregl.Map | null = null;
@@ -127,32 +187,30 @@ export function Globe() {
       // Globe when zoomed out, a flat map that fills the screen when zoomed in.
       projection: { type: ['interpolate', ['linear'], ['zoom'], 3, 'vertical-perspective', 4, 'mercator'] },
       sky: {
-        'sky-color': '#06120f', 'horizon-color': '#1b4d40', 'fog-color': '#0a1a16',
+        'sky-color': '#05060f', 'horizon-color': '#27356e', 'fog-color': '#0a0d1e',
         'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 4, 0.4, 6, 0],
       },
       sources: {
         earth: { type: 'raster', tiles: [`${BASE}tiles/{z}/{x}/{y}.jpg`], tileSize: 256, maxzoom: 5 },
+        // Sharper Blue Marble from NASA GIBS when online and zoomed in; the bundled tiles stay underneath for offline use.
+        earthHi: { type: 'raster', tiles: [`${GIBS}/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg`], tileSize: 256, minzoom: 5, maxzoom: 8 },
         countries: { type: 'geojson', data: `${BASE}data/geo/countries.geojson` },
         window: { type: 'geojson', data: windowOutline(s.lat, s.lon, s.size) },
         scan: { type: 'geojson', data: line(s.lon, s.lat - s.size / 2, s.lat + s.size / 2) },
         centre: { type: 'geojson', data: point(s.lat, s.lon) },
-        holo: { type: 'geojson', data: holoFeatures(s.halo), buffer: 0, tolerance: 0 },
         ...Object.fromEntries(HALVES.map((h) => [h.id, { type: 'image', url: BLANK, coordinates: coords(h.west, h.east) }])),
+        ovD: { type: 'image', url: BLANK, coordinates: coords(-1, 1) },
       },
       layers: [
-        { id: 'space', type: 'background', paint: { 'background-color': '#071311' } },
-        // NASA Blue Marble, slightly muted so the holographic overlay and lines read on top.
-        { id: 'earth', type: 'raster', source: 'earth', paint: { 'raster-saturation': -0.15, 'raster-contrast': 0.12, 'raster-brightness-max': 0.82, 'raster-fade-duration': 0 } },
-        ...HALVES.map((h) => ({ id: h.id, type: 'raster' as const, source: h.id, paint: { 'raster-opacity': 0.4, 'raster-fade-duration': 250, 'raster-resampling': 'linear' as const } })),
+        { id: 'space', type: 'background', paint: { 'background-color': '#05070f' } },
+        // NASA Blue Marble, slightly muted so the heatmap and lines read on top.
+        { id: 'earth', type: 'raster', source: 'earth', paint: { 'raster-saturation': -0.25, 'raster-contrast': 0.1, 'raster-brightness-max': 0.78, 'raster-fade-duration': 0 } },
+        { id: 'earthHi', type: 'raster', source: 'earthHi', minzoom: 5, paint: { 'raster-saturation': -0.25, 'raster-contrast': 0.1, 'raster-brightness-max': 0.78 } },
+        ...[...HALVES, { id: 'ovD' }].map((h) => ({ id: h.id, type: 'raster' as const, source: h.id, paint: { 'raster-opacity': h.id === 'ovD' ? 1 : 0.9, 'raster-fade-duration': 0, 'raster-resampling': 'linear' as const } })),
         // Sharp, glowing coastlines and borders over the imagery (Natural Earth, true geography).
-        { id: 'coast-glow', type: 'line', source: 'countries', paint: { 'line-color': '#5cffc0', 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 3, 6, 7], 'line-blur': 3, 'line-opacity': 0.22 } },
-        { id: 'borders', type: 'line', source: 'countries', paint: { 'line-color': '#dcfff0', 'line-opacity': 0.8, 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 1.4] } },
-        // Stacked data layers around the window, in 3D.
-        { id: 'holo-plates', type: 'fill-extrusion', source: 'holo', filter: ['==', ['get', 'kind'], 'plate'],
-          paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 0.08 } },
-        { id: 'holo-cells', type: 'fill-extrusion', source: 'holo', filter: ['==', ['get', 'kind'], 'cell'],
-          paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 0.7, 'fill-extrusion-vertical-gradient': true } },
-        { id: 'win-fill', type: 'fill', source: 'window', paint: { 'fill-color': MINT, 'fill-opacity': 0.07 } },
+        { id: 'coast-glow', type: 'line', source: 'countries', paint: { 'line-color': '#8fb4ff', 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 2, 6, 5], 'line-blur': 2, 'line-opacity': 0.14 } },
+        { id: 'borders', type: 'line', source: 'countries', paint: { 'line-color': '#f2f6ff', 'line-opacity': 0.8, 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.5, 6, 1.3] } },
+        { id: 'win-fill', type: 'fill', source: 'window', paint: { 'fill-color': MINT, 'fill-opacity': 0.05 } },
         { id: 'win-glow', type: 'line', source: 'window', paint: { 'line-color': MINT, 'line-width': 8, 'line-blur': 7, 'line-opacity': 0.35 } },
         { id: 'win-line', type: 'line', source: 'window', paint: { 'line-color': '#e9fff4', 'line-width': 1.4, 'line-dasharray': [3, 2] } },
         { id: 'scan-glow', type: 'line', source: 'scan', paint: { 'line-color': MINT, 'line-width': 10, 'line-blur': 8, 'line-opacity': 0.5 } },
@@ -160,35 +218,40 @@ export function Globe() {
         { id: 'centre', type: 'circle', source: 'centre', paint: { 'circle-radius': 4, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#f1fff8', 'circle-stroke-width': 1.5 } },
       ],
     };
+    // Navigation as in NASA Eyes on the Earth: drag spins the globe with inertia, wheel and pinch zoom smoothly,
+    // double-click zooms in, north stays up. The listening window is locked to the centre of the view, so turning the
+    // globe is how you move through the data.
     const map = new maplibregl.Map({
-      container: el.current!, style, center: [s.lon, s.lat], zoom: 1.9, pitch: 28, maxPitch: 70, interactive: false, attributionControl: false,
-      canvasContextAttributes: { preserveDrawingBuffer: true }, // the bloom pass copies each frame
+      container: el.current!, style, center: [s.lon, s.lat], zoom: fitZoom(el.current!, s.lat), minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM,
+      attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, keyboard: false, boxZoom: false,
     });
+    map.touchZoomRotate.disableRotation();
     mapRef = map;
-    if (import.meta.env.DEV) (window as unknown as { map: maplibregl.Map }).map = map; // console debugging
-    // Bloom: a quarter-size copy of each rendered frame, thresholded and blurred, screened over the map.
-    const bloom = document.createElement('canvas');
-    bloom.className = 'bloom-canvas';
-    bloom.setAttribute('aria-hidden', 'true');
-    el.current!.append(bloom);
-    const bctx = bloom.getContext('2d')!;
-    const canFilter = 'filter' in bctx;
-    map.on('render', () => {
-      if (!canFilter) return;
-      const src = map.getCanvas(), w = Math.max(1, src.width >> 2), h = Math.max(1, src.height >> 2);
-      if (bloom.width !== w || bloom.height !== h) { bloom.width = w; bloom.height = h; }
-      bctx.filter = 'brightness(0.6) contrast(3) saturate(1.4)'; // keeps only the bright parts (lines, data, lights)
-      bctx.clearRect(0, 0, w, h);
-      bctx.drawImage(src, 0, 0, w, h);
-    });
     const effects = createFx(map, el.current!);
 
-    const overlayLayer = () => { const a = useApp.getState().active; return a[a.length - 1]; };
     // 'style.load', not 'load': the scan line's per-frame setData means the map is never fully "loaded".
-    map.once('style.load', () => {
-      void drawOverlay(map, overlayLayer(), useApp.getState().date);
-      (map.getSource('holo') as GeoJSONSource).setData(holoFeatures(useApp.getState().halo)); // halo may predate the style
+    map.once('style.load', () => void drawOverlay(map));
+    let detailTimer = 0;
+    map.on('moveend', () => { clearTimeout(detailTimer); detailTimer = window.setTimeout(() => void drawDetail(map), 150); });
+
+    // ---- the window follows the view centre ----
+    // Camera moves we cause ourselves (following a keyboard glide) are "syncing" and do not move the window back.
+    let moving = false, syncing = false;
+    map.on('movestart', () => { if (syncing || isGliding()) return; moving = true; dragStart(); });
+    map.on('move', () => {
+      if (!moving) return;
+      const c = map.getCenter();
+      setCenter(c.lat, c.lng, false);
     });
+    map.on('moveend', () => {
+      if (!moving) return;
+      moving = false;
+      const c = map.getCenter();
+      setCenter(c.lat, c.lng, true); // commit: borders crossed, "Now over"
+      dragEnd();
+    });
+    // A click (no drag) glides the view, and the window with it, to that place.
+    map.on('click', (e) => map.easeTo({ center: e.lngLat, duration: 900, easing: (t) => 1 - (1 - t) ** 3 }));
 
     // Resize handle on the window's north-east corner.
     const handle = document.createElement('div');
@@ -196,6 +259,7 @@ export function Globe() {
     handle.setAttribute('aria-hidden', 'true'); // keyboard and screen readers use + and - or the size slider
     const marker = new maplibregl.Marker({ element: handle, draggable: true }).setLngLat([s.lon + s.size / 2, s.lat + s.size / 2]).addTo(map);
     let resizing = false;
+    const wrap = (d: number) => ((d + 540) % 360) - 180;
     marker.on('dragstart', () => { resizing = true; dragStart(); });
     marker.on('drag', () => {
       const ll = marker.getLngLat(), st = useApp.getState();
@@ -209,140 +273,40 @@ export function Globe() {
         (map.getSource('window') as GeoJSONSource | undefined)?.setData(windowOutline(st.lat, st.lon, st.size));
         (map.getSource('centre') as GeoJSONSource | undefined)?.setData(point(st.lat, st.lon));
         if (!resizing) marker.setLngLat([st.lon + st.size / 2, Math.min(MAX_MERC, st.lat + st.size / 2)]);
+        // Moved from elsewhere (keys, tour, pole clamp): bring the view along unless the user is turning the globe.
+        if (!moving) {
+          const c = map.getCenter();
+          if (Math.abs(c.lat - st.lat) > 1e-7 || Math.abs(c.lng - st.lon) > 1e-7) {
+            syncing = true;
+            // On the globe, MapLibre's zoom is relative to the centre latitude: compensate so the planet keeps its size.
+            const z = map.getZoom(), rad = Math.PI / 180;
+            map.jumpTo({ center: [st.lon, st.lat], zoom: z < 3 ? Math.max(MIN_ZOOM, z + Math.log2(Math.cos(st.lat * rad) / Math.cos(c.lat * rad))) : z });
+            syncing = false;
+          }
+        }
       }
-      // Blocks are geographic, so they can stay put while the window glides; refresh once it comes to rest.
-      if (st.halo !== prev.halo && !st.dragging) (map.getSource('holo') as GeoJSONSource | undefined)?.setData(holoFeatures(st.halo));
       if (st.date !== prev.date || st.active !== prev.active || st.layers !== prev.layers) {
         clearTimeout(overlayTimer);
-        overlayTimer = window.setTimeout(() => void drawOverlay(map, overlayLayer(), st.date), 120);
+        overlayTimer = window.setTimeout(() => void drawOverlay(map), 120);
       }
     });
 
-    // ---- gestures: one finger moves the window, two fingers rotate and pinch ----
-    const c = el.current!;
-    const pts = new Map<number, { x: number; y: number }>();
-    let mode: 'none' | 'pending' | 'window' | 'globe' = 'none';
-    let grace = 0;
-    let offset = { lat: 0, lon: 0 };
-    let start = { lat: 0, lon: 0 };
-    let last = { x: 0, y: 0, d: 0 };
-    let spin = false; // two-finger touch: the globe turns under the fingers, the window stays at the touch point
-
-    // Per frame: move the scan line and keep the window in view with a gentle camera chase.
-    let raf = 0, lastFrame = performance.now();
+    // Per frame: move the scan line.
+    let raf = 0;
     const frame = (now: number) => {
       effects.frame(now);
       const st = useApp.getState();
       const west = st.lon - st.size / 2;
       (map.getSource('scan') as GeoJSONSource | undefined)?.setData(
         line(west + st.size * engine.loopPhase(), Math.max(-MAX_MERC, st.lat - st.size / 2), Math.min(MAX_MERC, st.lat + st.size / 2)));
-      // Only a keyboard or button glide moves the camera. Touch never moves the globe with one finger.
-      // Continuous eased follow (frame-rate independent), so the globe glides with the window instead of lurching.
-      const dt = Math.min(0.05, (now - lastFrame) / 1000);
-      lastFrame = now;
-      if (mode === 'none' && isGliding() && !st.globeMode && !resizing) {
-        const ctr = map.getCenter(), k = 1 - Math.exp(-dt * 3.5);
-        map.jumpTo({ center: [ctr.lng + wrap(st.lon - ctr.lng) * k, ctr.lat + (st.lat - ctr.lat) * k] });
-      }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-
-    const local = (e: PointerEvent) => { const r = c.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-    const measure = () => {
-      const p = [...pts.values()];
-      const x = p.reduce((a, q) => a + q.x, 0) / p.length, y = p.reduce((a, q) => a + q.y, 0) / p.length;
-      return { x, y, d: p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0 };
-    };
-    const beginWindow = (p: { x: number; y: number }, touch: boolean) => {
-      const st = useApp.getState();
-      const ll = map.unproject([p.x, p.y]);
-      start = { lat: st.lat, lon: st.lon };
-      // Touch: the window centre sits exactly under the fingertip, so the contact point is the probe
-      // and land/water crossings under the finger give haptics. Mouse keeps its grab offset.
-      offset = touch ? { lat: 0, lon: 0 } : { lat: st.lat - ll.lat, lon: wrap(st.lon - ll.lng) };
-      mode = 'window';
-      dragStart();
-      if (touch) setCenter(ll.lat, ll.lng, false);
-    };
-    const rotate = (dx: number, dy: number) => {
-      const k = 360 / (512 * 2 ** map.getZoom());
-      const ctr = map.getCenter();
-      map.jumpTo({ center: [ctr.lng - dx * k, Math.max(-80, Math.min(80, ctr.lat + dy * k))] });
-    };
-
-    const down = (e: PointerEvent) => {
-      c.setPointerCapture(e.pointerId);
-      pts.set(e.pointerId, local(e));
-      if (e.pointerType === 'mouse') {
-        if (e.button === 2 || e.shiftKey) { mode = 'globe'; last = measure(); } else beginWindow(local(e), false);
-        return;
-      }
-      if (pts.size === 1) {
-        mode = 'pending';
-        grace = window.setTimeout(() => { if (pts.size === 1 && mode === 'pending') beginWindow([...pts.values()][0], true); }, 80);
-      } else {
-        clearTimeout(grace);
-        if (mode !== 'window') dragStart();
-        mode = 'globe';
-        spin = true;
-        last = measure();
-      }
-    };
-    const move = (e: PointerEvent) => {
-      if (!pts.has(e.pointerId)) return;
-      pts.set(e.pointerId, local(e));
-      if (mode === 'window') {
-        const p = local(e);
-        const ll = map.unproject([p.x, p.y]);
-        setCenter(ll.lat + offset.lat, ll.lng + offset.lon, false);
-      } else if (mode === 'globe') {
-        const m = measure();
-        rotate(m.x - last.x, m.y - last.y);
-        if (m.d && last.d) map.setZoom(Math.max(0.8, Math.min(8, map.getZoom() + Math.log2(m.d / last.d))));
-        last = m;
-        if (spin) {
-          const ll = map.unproject([m.x, m.y]);
-          setCenter(ll.lat, ll.lng, false);
-        }
-      }
-    };
-    const up = (e: PointerEvent) => {
-      if (!pts.delete(e.pointerId)) return;
-      if (mode === 'pending' && pts.size === 0) {
-        clearTimeout(grace);
-        const p = local(e);
-        const ll = map.unproject([p.x, p.y]);
-        setCenter(ll.lat, ll.lng, true); // a quick tap places the window
-      }
-      if (pts.size === 0) {
-        if (mode === 'window' || spin) dragEnd();
-        spin = false;
-        mode = 'none';
-      } else if (mode === 'globe') last = measure();
-    };
-    const wheel = (e: WheelEvent) => {
-      e.preventDefault();
-      map.setZoom(Math.max(0.8, Math.min(8, map.getZoom() - e.deltaY / 400)));
-    };
-    const noMenu = (e: Event) => e.preventDefault();
-    c.addEventListener('pointerdown', down);
-    c.addEventListener('pointermove', move);
-    c.addEventListener('pointerup', up);
-    c.addEventListener('pointercancel', up);
-    c.addEventListener('wheel', wheel, { passive: false });
-    c.addEventListener('contextmenu', noMenu);
 
     return () => {
       cancelAnimationFrame(raf);
       effects.dispose();
       unsub();
-      c.removeEventListener('pointerdown', down);
-      c.removeEventListener('pointermove', move);
-      c.removeEventListener('pointerup', up);
-      c.removeEventListener('pointercancel', up);
-      c.removeEventListener('wheel', wheel);
-      c.removeEventListener('contextmenu', noMenu);
       map.remove();
       mapRef = null;
     };
@@ -355,12 +319,12 @@ export function Globe() {
       role="application"
       tabIndex={0}
       aria-roledescription="globe"
-      aria-label="Globe with listening window. Arrow keys glide the window, plus and minus resize it, W says where you are, H says what you hear, M opens the menu. One finger moves the window under your fingertip; two fingers spin and zoom the globe while the window stays under your fingers."
+      aria-label="Globe. The listening window is the centre of the view. Drag to turn the globe, scroll or pinch to zoom, click a place to glide there. Arrow keys glide, plus and minus resize the window, W says where you are, H says what you hear, B finds the nearest peak and valley, A opens the audio assistant, M opens the menu."
     />
   );
 }
 
-/** Rotate the globe camera (G mode arrows). */
+/** Rotate the globe camera (G mode arrows). The window follows the view centre. */
 export function rotateGlobe(dLat: number, dLon: number) {
   if (!mapRef) return;
   const c = mapRef.getCenter();
@@ -369,5 +333,5 @@ export function rotateGlobe(dLat: number, dLon: number) {
 
 export function zoomBy(d: number) {
   if (!mapRef) return;
-  mapRef.easeTo({ zoom: Math.max(0.8, Math.min(8, mapRef.getZoom() + d)), duration: 450 });
+  mapRef.easeTo({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, mapRef.getZoom() + d)), duration: 450 });
 }

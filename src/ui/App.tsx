@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { glideStop, startFromGesture } from '../controller';
 import { useApp } from '../state';
 import { Controls } from './Controls';
+import { Galaxy } from './Galaxy';
 import { Globe } from './Globe';
 import { onKey, onKeyUp } from './keyboard';
 
@@ -23,11 +24,14 @@ function StartScreen() {
     return () => window.removeEventListener('keydown', key);
   }, []);
   return (
-    <button ref={root} type="button" className="start" autoFocus onPointerDown={startFromGesture} onClick={startFromGesture}>
-      <span className="eyebrow">NASA Space Apps 2026 · Earth Information Jukebox</span>
-      <span className="title">Feel the Earth</span>
-      <span className="pulse">{loading ? 'Loading sounds…' : START_TEXT}</span>
-    </button>
+    <>
+      <Galaxy />
+      <button ref={root} type="button" className="start" autoFocus onPointerDown={startFromGesture} onClick={startFromGesture}>
+        <span className="eyebrow">NASA Space Apps 2026 · Earth Information Jukebox</span>
+        <span className="title">Feel the Earth</span>
+        <span className="pulse">{loading ? 'Loading sounds…' : START_TEXT}</span>
+      </button>
+    </>
   );
 }
 
@@ -52,6 +56,7 @@ export function App() {
   if (!started) return <StartScreen />;
   return (
     <main className="app">
+      <Galaxy />
       <Globe />
       <Controls />
     </main>

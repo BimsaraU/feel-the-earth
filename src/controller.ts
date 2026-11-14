@@ -3,14 +3,14 @@
 import { engine } from './audio/engine';
 import { fx } from './fx';
 import { moodOf } from './audio/harmony';
-import { norm, severity, voiceFor } from './audio/mapping';
-import { placeName, spokenDate, whatAmIHearing, whereAmI } from './assist/answers';
+import { denorm, norm, severity, voiceFor } from './audio/mapping';
+import { placeName, spokenDate, spokenNumber, whatAmIHearing, whereAmI } from './assist/answers';
 import { announce, say } from './assist/speech';
 import { source } from './data';
 import { normLon } from './data/fixture';
 import type { BBox, LayerId } from './data/types';
 import { GeoEventTracker, LINE_NAMES, type GeoEvent } from './geo/events';
-import { loadGeo, type GeoGrid } from './geo/grid';
+import { compassWord, loadGeo, type GeoGrid } from './geo/grid';
 import { haptics } from './haptics/haptics';
 import { gsap } from 'gsap';
 import { HALO, MAX_LAT, MAX_LAYERS, MAX_SIZE, MIN_SIZE, useApp, type Halo } from './state';
@@ -48,6 +48,16 @@ async function boot() {
   useApp.subscribe((s, prev) => { if (s.settings !== prev.settings) applySettings(prev.settings.keyRoot !== s.settings.keyRoot); });
   engine.onBar = () => { if (st().travelling) travelStep(); };
   engine.onAccent = () => { if (st().settings.hapticAccents) haptics.pulse('accent'); };
+  if (engine.terrain) {
+    engine.terrain.onStep = () => haptics.pulse('tick'); // every contour crossed is a detent under the finger
+    engine.terrain.onArrive = (which, spot) => {
+      const top = topLayer();
+      if (which === 'peak') engine.play('smallbell', { rate: 1.5, db: -12 }); else engine.play('framedrum', { rate: 0.7, db: -10, lowpass: 500 });
+      haptics.pulse('coast');
+      fx.emit({ kind: 'coast', to: which === 'peak' ? 'land' : 'sea' });
+      if (top) void say(`${which === 'peak' ? 'Peak' : 'Valley'}: ${spokenNumber(denorm(spot.t, top))} ${top.unitSpoken}.`, false);
+    };
+  }
   syncVoices();
   engine.field?.move(st().lat, st().lon, st().size);
   updateSurface();
@@ -65,6 +75,7 @@ function applySettings(keyChanged = false) {
   engine.setMasterVolume(s.masterVolume);
   engine.setMono(s.mono);
   engine.field?.setEnabled(s.spatial);
+  engine.terrain?.setEnabled(s.probe);
   engine.keyRoot = s.keyRoot;
   for (const [id, v] of engine.voices) v.setLevel(s.layerDb[id] ?? 0);
   haptics.enabled = s.haptics;
@@ -119,6 +130,7 @@ export async function refreshHalo() {
   const top = active[active.length - 1];
   st().set({ halo });
   engine.field?.setHalo(halo, top ? layerInfo(top) : null);
+  engine.terrain?.setHalo(halo, top ? layerInfo(top) : null);
 }
 
 let scrubQueued = false;
@@ -144,6 +156,7 @@ function syncVoices() {
 // ---------- window movement ----------
 
 let lastMove = { t: 0, lat: 0, lon: 0 };
+let regenAt = 0;
 let whooshStop = 0;
 const motion = { e: 0, n: 0 };
 
@@ -166,13 +179,13 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
   engine.setMoveSpeed(settle ? 30 : dist / dt);
   // Direction of travel in window widths per second, smoothed; a jump (tap, settle) is not travel.
   if (!settle && dt < 0.25) {
-    const w = st().size, k = 0.25;
+    const w = st().size, k = 0.15;
     motion.e += ((dLon * Math.cos((lat * Math.PI) / 180)) / w / dt - motion.e) * k;
     motion.n += (dLat / w / dt - motion.n) * k;
     engine.setMotion(motion.e, motion.n);
   }
   clearTimeout(whooshStop);
-  whooshStop = window.setTimeout(() => { engine.setMoveSpeed(0); motion.e = motion.n = 0; engine.setMotion(0, 0); }, settle ? 250 : 150);
+  whooshStop = window.setTimeout(() => { engine.setMoveSpeed(0); motion.e = motion.n = 0; engine.setMotion(0, 0); engine.setProbing(false); }, settle ? 250 : 350);
 
   st().set({ lat, lon });
   engine.field?.move(lat, lon, st().size);
@@ -185,6 +198,9 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
     scheduleRegen();
   } else {
     scrub();
+    if (st().settings.probe) { engine.setProbing(true); engine.terrain?.move(lat, lon, st().size); }
+    // The notes follow the window while it travels, not only once it rests.
+    if (now - regenAt > 400) { regenAt = now; void regenerate(); }
   }
 }
 
@@ -197,8 +213,8 @@ function updateSurface() {
   const { lat, lon, size } = st();
   if (!geo) return;
   const box = bboxOf(lat, lon, size);
-  // Chill: 0 at sea level, 1 at 3,000 m and above.
-  engine.setSurface(geo.landShare(box), Math.min(1, geo.landElevation(box) / 3000));
+  // Height: 0 below 600 m (no wind on lowland), 1 at 3,000 m and above.
+  engine.setSurface(geo.landShare(box), Math.max(0, Math.min(1, (geo.landElevation(box) - 600) / 2400)));
 }
 
 // Smooth gliding: held arrows move at settings.navSpeed window widths per second, with eased start and stop.
@@ -334,6 +350,16 @@ export function toggleLayer(id: LayerId) {
   scheduleRegen();
 }
 
+/** Draw this active layer on the map (the last active layer is the one drawn and probed). */
+export function showLayer(id: LayerId) {
+  const { active } = st();
+  if (!active.includes(id) || active[active.length - 1] === id) return;
+  st().set({ active: [...active.filter((a) => a !== id), id] });
+  void say(`${layerInfo(id).name} on the map.`);
+  syncVoices();
+  scheduleRegen();
+}
+
 // ---------- time ----------
 
 export function stepDate(days: number, months = 0) {
@@ -463,6 +489,21 @@ export async function askWhat() {
     mean: (await source.getWindow(id, box, date, 32)).stats.mean,
   })));
   void say(whatAmIHearing(items, engine.severity));
+}
+
+const topLayer = () => { const a = st().active; return a.length ? layerInfo(a[a.length - 1]) : undefined; };
+
+/** Where the highest and lowest values near the window are; their beacons ping for a few seconds. */
+export function askBeacons() {
+  const top = topLayer(), r = engine.terrain?.last;
+  if (!top || !r) { void say('No layer on the map to search.'); return; }
+  if (!r.peak || !r.valley) { void say(`${top.name} is flat or missing around here.`); return; }
+  const { size } = st();
+  const where = (s: NonNullable<typeof r.peak>) => (s.dist < 0.12 ? 'right here'
+    : `${spokenNumber(s.dist * size)} degrees ${compassWord(((Math.atan2(s.east, s.north) * 180) / Math.PI + 360) % 360)}`);
+  engine.terrain?.ping(6000);
+  void say(`${top.name}. Highest nearby, the high beacon: ${spokenNumber(denorm(r.peak.t, top))} ${top.unitSpoken}, ${where(r.peak)}. ` +
+    `Lowest nearby, the low beacon: ${spokenNumber(denorm(r.valley.t, top))} ${top.unitSpoken}, ${where(r.valley)}.`);
 }
 
 export function togglePlay() {

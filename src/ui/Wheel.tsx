@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { engine } from '../audio/engine';
 import { haptics } from '../haptics/haptics';
 
 interface Props {
@@ -22,16 +23,25 @@ interface Props {
  */
 export function Wheel({ label, value, min, max, step, format, onChange, onCommit, pxPerStep = 14 }: Props) {
   const el = useRef<HTMLDivElement>(null);
-  const live = useRef({ value, acc: 0, vel: 0, raf: 0, lastX: 0, lastT: 0, dragging: false });
+  const live = useRef({ value, acc: 0, vel: 0, raf: 0, lastX: 0, lastT: 0, dragging: false, clickAt: 0 });
   live.current.value = value;
   const steps = Math.round((value - min) / step);
 
   const set = (v: number) => {
     const clamped = Math.min(max, Math.max(min, Math.round((v - min) / step) * step + min));
-    if (clamped !== live.current.value) {
-      live.current.value = clamped;
+    const s = live.current, now = performance.now();
+    if (clamped !== s.value) {
+      // Every step is a detent you can feel and hear: a haptic tick and a dry click, higher going up.
       haptics.pulse('tick');
+      if (now - s.clickAt > 28) { s.clickAt = now; engine.detent(clamped > s.value); }
+      s.value = clamped;
       onChange(clamped);
+    } else if ((v > max || v < min) && now - s.clickAt > 300) {
+      // End stop: a dull thud and a nudge of the drum.
+      s.clickAt = now;
+      engine.play('thump', { db: -12, music: true });
+      haptics.pulse('coast');
+      el.current?.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${v > clamped ? -5 : 5}px)` }, { transform: 'translateX(0)' }], { duration: 160 });
     }
     return clamped;
   };
@@ -106,6 +116,7 @@ export function Wheel({ label, value, min, max, step, format, onChange, onCommit
         }}
         onKeyUp={() => onCommit?.()}
       >
+        <span className="wheel-shade" aria-hidden="true" />
         <span className="wheel-mark" aria-hidden="true" />
       </div>
     </div>

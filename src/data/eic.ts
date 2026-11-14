@@ -83,7 +83,8 @@ export class EicSource implements DataSource {
           // Bilinear between the four nearest cells, ignoring cells without data.
           const y0 = Math.floor(y), x0 = Math.floor(x), fy = y - y0, fx = x - x0;
           let s = 0, w = 0;
-          for (const [dy, dx, wt] of [[0, 0, (1 - fy) * (1 - fx)], [0, 1, (1 - fy) * fx], [1, 0, fy * (1 - fx)], [1, 1, fy * fx]] as const) {
+          for (let k = 0; k < 4; k++) {
+            const dy = k >> 1, dx = k & 1, wt = (dy ? fy : 1 - fy) * (dx ? fx : 1 - fx);
             const v = value(y0 + dy, x0 + dx);
             if (!Number.isNaN(v) && wt > 0) { s += v * wt; w += wt; }
           }
