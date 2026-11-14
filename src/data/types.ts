@@ -1,4 +1,4 @@
-export type LayerId = 'sst' | 'lightning' | 'lights' | 'lightschange';
+export type LayerId = 'sst' | 'lightning' | 'lights' | 'lightschange' | 'co2' | 'airtemp' | 'precip' | 'ndvi' | 'aerosol';
 
 export interface LayerInfo {
   id: LayerId;
@@ -11,7 +11,7 @@ export interface LayerInfo {
   scale: 'linear' | 'log';
   timeRange: [string, string];
   resolutionDeg: number;
-  cadence: 'daily' | '10-day' | 'annual' | 'static';
+  cadence: 'daily' | '10-day' | 'monthly' | 'annual' | 'static';
   sourceText: string;
   /** True for invented data. Must be labelled DEMO DATA on screen and in speech. */
   demo: boolean;

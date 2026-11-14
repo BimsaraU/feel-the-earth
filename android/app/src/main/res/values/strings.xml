@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Feel the Earth</string>
+    <string name="title_activity_main">Feel the Earth</string>
+    <string name="package_name">org.spaceapps.feeltheearth</string>
+    <string name="custom_url_scheme">org.spaceapps.feeltheearth</string>
+</resources>

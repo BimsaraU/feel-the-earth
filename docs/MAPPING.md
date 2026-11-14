@@ -12,6 +12,11 @@ Spans read "at layer minimum → at layer maximum" of the window mean.
 | 2 | Lightning | 0 to 0.4 index | linear | glock | color | 79-98 | 900 | 7000 → 12000 | 0.7 | rain -44 → -16 | high (t 0.3 → 0.75): thunderstorms | Each bright strike is a lightning hot spot; more strikes and louder rain mean more lightning. |
 | 3 | Night lights | 0 to 0.6 index | linear | harp | arp | 62-86 | 200 | 3500 → 9000 | 0.7 |  | high (t 2 → 3): none | More and brighter harp notes mean more night light from towns and cities. |
 | 4 | Night light change 2012 to 2023 | -0.6 to 0.6 index | linear | clarinet | pad | 50-67 | 150 | 1200 → 5000 | 0.7 |  | high (t 2 → 3): none | Bright and loud means new lights since 2012; dark and quiet means lights went out. |
+| 5 | Carbon dioxide | 390 to 405 ppm | linear | cello | bass | 38-55 | 40 | 700 → 2200 | 0.7 → 1.4 |  | high (t 0.7 → 0.95): high carbon dioxide | A deep held bass; louder and more growling means more carbon dioxide in the air. |
+| 6 | Air temperature | 201 to 319 K | linear | clarinet | melody | 55-76 | 300 → 120 | 2500 → 7000 | 0.7 |  | high (t 0.86 → 0.97): extreme heat | Louder and brighter clarinet means warmer air near the surface. |
+| 7 | Precipitation | 0 to 20 mm/day | linear | harp | arp | 64-88 | 300 | 3000 → 8000 | 0.7 | rain -50 → -18 | high (t 0.7 → 0.95): very heavy rain | More harp notes and louder rain mean more rainfall that month. |
+| 8 | Vegetation | -0.03 to 0.98 NDVI | linear | cello | pad | 50-69 | 200 → 80 | 1200 → 6000 | 0.7 |  | high (t 2 → 3): none | Fuller, brighter chords mean greener, denser vegetation; thin chords mean bare ground. |
+| 9 | Aerosols | 0 to 0.9 AOD | linear | glock | pulse | 72-91 | 600 | 9000 → 1500 | 0.7 |  | high (t 0.45 → 0.85): hazy, polluted air | A steady pulse that gets louder and more muffled as the air gets hazier. |
 
 ## Window features (all layers)
 
@@ -27,7 +32,8 @@ Spans read "at layer minimum → at layer maximum" of the window mean.
 | East-west position | Stereo follows the scan from left to right. |
 | Land and water share | Ambience: soft sea wash for water, land sounds for land, mixed by share. |
 | Land elevation | Land ambience: low land is warm (breeze and birds, darker), high land chilly (mountain wind, thinner). |
-| No data | Soft felt-piano pulse on that beat. Never silence. |
+| No data | That layer is silent on that beat (no stand-in sound). |
+| Direction of travel | While the window moves the whole mix leans left or right with east-west travel and gets brighter going north, darker going south; the whoosh pans with it. |
 
 ## Events
 
@@ -53,7 +59,6 @@ Spans read "at layer minimum → at layer maximum" of the window mean.
 |---|---|
 | border | 12, 40, 12 |
 | coast | 30 |
-| noData | 5, 30, 5, 30, 5 |
 | timeStep | 8 |
 | accent | 10 |
 | test | 40, 60, 40 |

@@ -23,3 +23,20 @@ Known issues in the sources:
   picked from the on-screen year labels (frame 5 + 17.5 per year).
 - Records do not overlap in time for sea temperature (2007-08) and the other layers (2012-23). Turning a layer
   on moves the date into its record and says so.
+
+## Stage 3: NASA GIBS layers (exact values)
+
+Built by `pipeline/build_gibs.py` from [NASA GIBS](https://nasa-gibs.github.io/gibs-api-docs/), the imagery service
+behind Worldview and the Earth Information Center dashboards. Every GIBS layer publishes a colour map
+(`colormaps/v1.3/<name>.xml`) mapping each exact RGB colour to a value bin, so values are read back exactly (bin
+midpoint; open-ended end bins clamp to their edge). Each month is a 720 x 360 WMS PNG averaged to 1 degree.
+
+| Key | Layer | GIBS layer | Time | Value |
+|---|---|---|---|---|
+| 5 | Carbon dioxide | `AIRS_L3_Carbon_Dioxide_AIRS_AMSU_Monthly` | monthly, 2010-01 .. 2012-02 | ppm (colour map floor is 390, so earlier years saturate and are left out) |
+| 6 | Air temperature | `AIRS_L3_Surface_Air_Temperature_Monthly_Day` | monthly, 2007 .. 2023 | K, daytime |
+| 7 | Precipitation | `MERRA2_Precipitation_Bias_Corrected_Monthly` | monthly, 2007 .. 2023 | mm/day (kg m-2 s-1 x 86400) |
+| 8 | Vegetation | `MODIS_Terra_L3_NDVI_Monthly` (colour map `MODIS_L3_NDVI`) | monthly, 2007 .. 2023 | NDVI |
+| 9 | Aerosols | `MERRA2_Total_Aerosol_Optical_Thickness_550nm_Extinction_Monthly` | monthly, 2007 .. 2023 | AOD at 550 nm |
+
+Ranges in the manifest are the 1st to 99th percentile of the colour-map bins.

@@ -27,6 +27,8 @@ export interface Pattern {
   /** Home pan including the gradient nudge; the scan sweeps around it. */
   pan: number;
   allNoData: boolean;
+  /** The ROWS x STEPS cells the pattern was read from (row 0 = north), for the visuals. */
+  cells: Float64Array;
 }
 
 /** ROWS x STEPS cells of normalised values (row 0 = north), NaN-aware block means. */
@@ -185,6 +187,7 @@ export function buildPattern(win: WindowData, layer: LayerInfo, voice: VoiceMapp
     textureDb: voice.texture ? span(voice.texture.db, t) : -Infinity,
     pan: clamp(voice.pan + (Number.isNaN(g) ? 0 : 0.15 * Math.sin((g * Math.PI) / 180)), -1, 1),
     allNoData: steps.every((x) => x.noData),
+    cells: c,
   };
 }
 

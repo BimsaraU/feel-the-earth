@@ -105,3 +105,8 @@ recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a deri
 | `public/audio/oneshots/rain.mp3` | [Falling Rain SFX 1 2016-11-19.oga](https://commons.wikimedia.org/wiki/File:Falling_Rain_SFX_1_2016-11-19.oga) by valvalion | CC BY 3.0 |
 | `public/audio/oneshots/timpani.mp3` | [VSCO-2-CE Percussion/Timpani/Timpani2_Hit_v3_rr1_Sum.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Timpani/Timpani2_Hit_v3_rr1_Sum.wav) | CC0 1.0 |
 | `public/audio/cellotrem/*.mp3` | VSCO-2-CE Strings/Cello Section/trem/* (https://github.com/sgossner/VSCO-2-CE) | CC0 1.0 |
+
+## Narration
+
+Listening-tour voice (public/audio/narration): generated locally with Kokoro-82M (hexgrad, Apache-2.0), voice `af_heart`,
+via kokoro-onnx (MIT). Script: src/assist/narration.json; build: scripts/build_narration.py.

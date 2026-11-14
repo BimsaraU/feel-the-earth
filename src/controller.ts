@@ -1,6 +1,7 @@
 // Glue between input, state, data, geo, audio, haptics and speech.
 
 import { engine } from './audio/engine';
+import { fx } from './fx';
 import { moodOf } from './audio/harmony';
 import { norm, severity, voiceFor } from './audio/mapping';
 import { placeName, spokenDate, whatAmIHearing, whereAmI } from './assist/answers';
@@ -12,7 +13,7 @@ import { GeoEventTracker, LINE_NAMES, type GeoEvent } from './geo/events';
 import { loadGeo, type GeoGrid } from './geo/grid';
 import { haptics } from './haptics/haptics';
 import { gsap } from 'gsap';
-import { MAX_LAT, MAX_LAYERS, MAX_SIZE, MIN_SIZE, useApp } from './state';
+import { HALO, MAX_LAT, MAX_LAYERS, MAX_SIZE, MIN_SIZE, useApp, type Halo } from './state';
 
 export let geo: GeoGrid | null = null;
 let tracker: GeoEventTracker | null = null;
@@ -48,20 +49,22 @@ async function boot() {
   engine.onBar = () => { if (st().travelling) travelStep(); };
   engine.onAccent = () => { if (st().settings.hapticAccents) haptics.pulse('accent'); };
   syncVoices();
+  engine.field?.move(st().lat, st().lon, st().size);
   updateSurface();
   await regenerate();
   engine.startLoop();
   st().set({ playing: true });
   const demo = layers.some((l) => l.demo) ? 'This build plays DEMO DATA, not NASA data. ' : '';
   void say(`${demo}Feel the Earth. You are listening to ${placeName(g, st().lat, st().lon)}. ` +
-    'Arrow keys move the listening window. Plus and minus change its size. Numbers 1 to 8 switch layers. ' +
-    'W: where am I. H: what am I hearing. Comma and full stop step through days. T plays the audio legend. V turns this voice off.');
+    'Arrow keys move the listening window. Plus and minus change its size. Numbers 1 to 9 switch layers. ' +
+    'W: where am I. H: what am I hearing. Comma and full stop step through days. T takes the listening tour. V turns this voice off.');
 }
 
 function applySettings(keyChanged = false) {
   const s = st().settings;
   engine.setMasterVolume(s.masterVolume);
   engine.setMono(s.mono);
+  engine.field?.setEnabled(s.spatial);
   engine.keyRoot = s.keyRoot;
   for (const [id, v] of engine.voices) v.setLevel(s.layerDb[id] ?? 0);
   haptics.enabled = s.haptics;
@@ -72,7 +75,6 @@ function applySettings(keyChanged = false) {
 // ---------- loop regeneration ----------
 
 let regenTimer = 0;
-const hadNoData = new Set<LayerId>();
 
 export function scheduleRegen() {
   clearTimeout(regenTimer);
@@ -91,11 +93,32 @@ async function regenerate() {
     const win = wins[k];
     means[id] = win.stats.mean;
     const pattern = engine.voices.get(id)?.render(win, layerInfo(id));
-    const noData = !!pattern?.steps.some((s) => s.noData);
-    if (noData && !hadNoData.has(id)) haptics.pulse('noData');
-    if (noData) hadNoData.add(id); else hadNoData.delete(id);
+    void pattern;
   }));
   st().set({ means });
+  void refreshHalo();
+}
+
+// ---------- halo: the larger map around the window (3D view + surround field) ----------
+
+const HALO_N = 48;
+let haloAt = 0, haloTimer = 0, haloSeq = 0;
+
+/** Sample every active layer over HALO x the window. Throttled to ~8 per second while moving. */
+export async function refreshHalo() {
+  const now = performance.now();
+  clearTimeout(haloTimer);
+  if (now - haloAt < 120) { haloTimer = window.setTimeout(() => void refreshHalo(), 120 - (now - haloAt)); return; }
+  haloAt = now;
+  const seq = ++haloSeq;
+  const { lat, lon, size, date, active } = st();
+  const box = bboxOf(lat, lon, size * HALO);
+  const wins = await Promise.all(active.map((id) => source.getWindow(id, box, date, HALO_N)));
+  if (seq !== haloSeq) return; // a newer request already started
+  const halo: Halo = { box, n: HALO_N, lat, lon, size, grids: Object.fromEntries(active.map((id, k) => [id, wins[k].grid])) };
+  const top = active[active.length - 1];
+  st().set({ halo });
+  engine.field?.setHalo(halo, top ? layerInfo(top) : null);
 }
 
 let scrubQueued = false;
@@ -122,6 +145,7 @@ function syncVoices() {
 
 let lastMove = { t: 0, lat: 0, lon: 0 };
 let whooshStop = 0;
+const motion = { e: 0, n: 0 };
 
 /** Move the window centre. settle = discrete move (keys, buttons), false while dragging. */
 export function setCenter(lat: number, lon: number, settle: boolean) {
@@ -136,13 +160,23 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
 
   // Whoosh level follows speed.
   const dt = Math.max(16, now - lastMove.t) / 1000;
-  const dist = Math.hypot(lat - lastMove.lat, ((lon - lastMove.lon + 540) % 360) - 180);
+  const dLon = ((lon - lastMove.lon + 540) % 360) - 180, dLat = lat - lastMove.lat;
+  const dist = Math.hypot(dLat, dLon);
   lastMove = { t: now, lat, lon };
   engine.setMoveSpeed(settle ? 30 : dist / dt);
+  // Direction of travel in window widths per second, smoothed; a jump (tap, settle) is not travel.
+  if (!settle && dt < 0.25) {
+    const w = st().size, k = 0.25;
+    motion.e += ((dLon * Math.cos((lat * Math.PI) / 180)) / w / dt - motion.e) * k;
+    motion.n += (dLat / w / dt - motion.n) * k;
+    engine.setMotion(motion.e, motion.n);
+  }
   clearTimeout(whooshStop);
-  whooshStop = window.setTimeout(() => engine.setMoveSpeed(0), settle ? 250 : 120);
+  whooshStop = window.setTimeout(() => { engine.setMoveSpeed(0); motion.e = motion.n = 0; engine.setMotion(0, 0); }, settle ? 250 : 150);
 
   st().set({ lat, lon });
+  engine.field?.move(lat, lon, st().size);
+  void refreshHalo();
   updateSurface();
   events.forEach((e) => playEvent(e));
   if (settle) {
@@ -259,7 +293,7 @@ export function resize(dir: 1 | -1) {
 export function setSize(next: number, animate: boolean) {
   next = Math.min(MAX_SIZE, Math.max(MIN_SIZE, next));
   gsap.killTweensOf(sizeAnim);
-  const apply = () => { st().set({ size: sizeAnim.v }); updateSurface(); scrub(); };
+  const apply = () => { st().set({ size: sizeAnim.v }); engine.field?.move(st().lat, st().lon, sizeAnim.v); void refreshHalo(); updateSurface(); scrub(); };
   if (!animate) { sizeAnim.v = next; apply(); return; }
   sizeAnim.v = st().size;
   gsap.to(sizeAnim, { v: next, duration: 0.35, ease: 'power2.out', onUpdate: apply, onComplete: () => scheduleRegen() });
@@ -325,6 +359,7 @@ export function setDate(iso: string, kind: 'day' | 'month' | 'quiet' = 'day', la
   st().set({ date: iso });
   if (kind !== 'quiet') {
     engine.play(kind === 'month' ? 'windchime' : 'ratchet', { db: kind === 'month' ? -6 : -4 });
+    fx.emit({ kind: 'time', big: kind === 'month' });
     haptics.pulse('timeStep');
   }
   announce(spokenDate(iso));
@@ -338,6 +373,7 @@ function travelStepSize(): { days: number; months: number } {
   const cad = st().active.map((id) => layerInfo(id)?.cadence);
   if (cad.includes('daily')) return { days: 1, months: 0 };
   if (cad.includes('10-day')) return { days: 10, months: 0 };
+  if (cad.includes('monthly')) return { days: 0, months: 1 };
   return { days: 0, months: 12 };
 }
 
@@ -360,7 +396,7 @@ export function setTravelling(on: boolean) {
   st().set({ travelling: on });
   if (on && !st().playing) togglePlay();
   const { days, months } = travelStepSize();
-  const unit = months ? 'a year' : days === 10 ? 'ten days' : 'a day';
+  const unit = months === 1 ? 'a month' : months ? 'a year' : days === 10 ? 'ten days' : 'a day';
   void say(on ? `Time travel on: ${unit} per bar.` : 'Time travel off.');
 }
 
@@ -381,21 +417,26 @@ export function playEvent(e: GeoEvent) {
       // Second tick higher when entering a country.
       engine.play('clave', { at: engine.now() + 0.12, rate: 1.26, db: -26, lowpass: 2200 });
       haptics.pulse('border');
+      fx.emit({ kind: 'border', lat: st().lat, lon: st().lon });
       break;
     }
     case 'coast':
       if (e.to === 'sea') engine.play('wave', { db: -20, lowpass: 1500 });
       else engine.play('framedrum', { db: -20, lowpass: 600 });
       haptics.pulse('coast');
+      fx.emit({ kind: 'coast', to: e.to });
       break;
     case 'line':
-      if (e.line === 'equator') engine.play('singingbowl', { db: -4 });
-      else if (e.line === 'antimeridian') engine.play('cymbal', { reverse: true, db: -6 });
-      else engine.play('smallbell', { rate: e.line === 'primeMeridian' ? 0.75 : 1, db: -6 });
+      // Lines sit just above the border ticks: noticeable, never startling.
+      if (e.line === 'equator') engine.play('singingbowl', { db: -20, lowpass: 2500 });
+      else if (e.line === 'antimeridian') engine.play('cymbal', { reverse: true, db: -22, lowpass: 4000 });
+      else engine.play('smallbell', { rate: e.line === 'primeMeridian' ? 0.75 : 1, db: -22, lowpass: 3500 });
+      fx.emit({ kind: 'line', line: e.line, lat: st().lat, lon: st().lon });
       announce(`Crossed ${LINE_NAMES[e.line]}.`);
       break;
     case 'pole':
-      engine.play('gong', { rate: 0.7, lowpass: 500, db: 2 });
+      engine.play('gong', { rate: 0.7, lowpass: 500, db: -10 });
+      fx.emit({ kind: 'pole' });
       void say(`${e.which === 'north' ? 'North' : 'South'} limit, 85 degrees.`, false);
       break;
     case 'manyBorders':

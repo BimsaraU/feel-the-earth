@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LayerId, LayerInfo } from './data/types';
+import type { BBox, LayerId, LayerInfo } from './data/types';
 
 export interface Settings {
   masterVolume: number; // 0..1
@@ -14,7 +14,13 @@ export interface Settings {
   keyRoot: number; // pitch class, 2 = D
   mono: boolean;
   highContrast: boolean;
+  /** Surround field: data around the window as 3D (HRTF) sources with doppler while moving. */
+  spatial: boolean;
 }
+
+/** The data map around the window, HALO times its size, sampled for every active layer. Feeds the 3D view and the surround field. */
+export interface Halo { box: BBox; n: number; lat: number; lon: number; size: number; grids: Partial<Record<LayerId, Float32Array>> }
+export const HALO = 2.5;
 
 export interface AppState {
   started: boolean;
@@ -31,8 +37,11 @@ export interface AppState {
   /** Time travel: the date advances one step per bar while the loop plays. */
   travelling: boolean;
   live: string;
+  /** Listening tour in progress: segment index, count, title and the words being spoken. */
+  tour: { i: number; n: number; title: string; text: string } | null;
   /** Window mean per active layer, from the last loop regeneration. */
   means: Partial<Record<LayerId, number>>;
+  halo: Halo | null;
   settings: Settings;
   set: (p: Partial<AppState>) => void;
   setSettings: (p: Partial<Settings>) => void;
@@ -41,7 +50,7 @@ export interface AppState {
 const SETTINGS_KEY = 'fte-settings';
 const defaults: Settings = {
   masterVolume: 0.7, layerDb: {}, speechRate: 1.1, voice: true, haptics: true, hapticAccents: false,
-  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false,
+  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true,
 };
 
 function loadSettings(): Settings {
@@ -66,7 +75,9 @@ export const useApp = create<AppState>((set) => ({
   globeMode: false,
   travelling: false,
   live: '',
+  tour: null,
   means: {},
+  halo: null,
   settings: loadSettings(),
   set: (p) => set(p),
   setSettings: (p) =>

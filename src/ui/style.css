@@ -80,7 +80,7 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 .globe { position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none;
   background: radial-gradient(80% 80% at 50% 50%, #0d2a22 0%, #050d0b 70%); }
 .globe:focus-visible { outline-offset: -4px; }
-.hud { position: absolute; inset: 0; pointer-events: none; }
+.hud { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .hud > * { pointer-events: auto; }
 
 .brand { position: absolute; top: 20px; left: 22px; max-width: min(46ch, 70vw); pointer-events: none; }
@@ -172,3 +172,30 @@ details summary { min-height: 48px; display: flex; align-items: center; cursor: 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---- audio-matched visuals (src/ui/fxLayer.ts) ---- */
+.fx-canvas, .fx-vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.fx-canvas { width: 100%; height: 100%; }
+.fx-vignette { z-index: 1; }
+.fx-banner {
+  position: absolute; left: 50%; top: 22%; transform: translateX(-50%); z-index: 1; pointer-events: none; visibility: hidden;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; white-space: nowrap;
+  letter-spacing: 0.3em; text-transform: uppercase;
+}
+.fx-banner-sub { font: 400 0.72rem var(--sans); color: var(--muted); }
+.fx-banner-title { font: 300 clamp(1.4rem, 4vw, 2.8rem)/1 var(--serif); color: #fff; text-shadow: 0 0 30px rgba(255, 230, 166, 0.8), 0 0 80px rgba(158, 242, 201, 0.5); }
+
+/* ---- listening tour card ---- */
+.tour { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); padding: 14px 18px 12px; z-index: 2; opacity: 1; background: var(--glass-strong); overflow: hidden; }
+.tour-progress { position: absolute; left: 0; top: 0; right: 0; height: 2px; background: var(--line); }
+.tour-progress span { display: block; height: 100%; background: var(--mint); box-shadow: 0 0 10px var(--mint); transition: width 0.6s; }
+.tour-title { font: 300 1.5rem/1.15 var(--serif); margin: 4px 0 6px; }
+.tour-text { font: 300 0.92rem/1.45 var(--sans); color: var(--muted); margin-bottom: 8px; }
+@media (max-width: 860px) { .tour { bottom: 12px; } .tour-text { font-size: 0.85rem; } }
+.app:has(.tour) .caption { opacity: 0; } /* the tour card shows the words; the caption stays as the live region */
+
+/* Bloom over the map (Globe.tsx) and faint scanlines: a God's-eye monitor look. */
+.bloom-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
+  mix-blend-mode: screen; opacity: 0.75; filter: blur(5px); }
+.globe::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(to bottom, rgba(158, 242, 201, 0.03) 0 1px, transparent 1px 3px); }

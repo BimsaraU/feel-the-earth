@@ -1,5 +1,7 @@
 import * as Tone from 'tone';
 import type { LayerId, LayerInfo, WindowData } from '../data/types';
+import { fx } from '../fx';
+import { Field } from './field';
 import { chordAt, type Mood } from './harmony';
 import { buildPattern, scanPan, STEPS, type Pattern, type Step } from './loop';
 import { scaleNotes, VOICES, type Instrument, type VoiceMapping } from './mapping';
@@ -32,7 +34,6 @@ export class Voice {
   private lp: Tone.Filter;
   private panner: Tone.Panner;
   private level = new Tone.Gain(0);
-  private piano: Tone.Sampler;
   private texture: Tone.Gain | null = null;
   private patterns: (Pattern | null)[] = [null, null];
   private active = 0;
@@ -41,7 +42,7 @@ export class Voice {
   userDb = 0;
   current: Pattern | null = null;
 
-  constructor(readonly map: VoiceMapping, buffers: Buffers, pianoBuffers: Buffers, out: Tone.InputNode, private score: Score, textureBuf?: Tone.ToneAudioBuffer) {
+  constructor(readonly map: VoiceMapping, buffers: Buffers, out: Tone.InputNode, private score: Score, textureBuf?: Tone.ToneAudioBuffer) {
     const env = ENVELOPE[map.instrument];
     this.lanes = [0, 1].map(() => new Tone.Sampler({ urls: buffers, ...env }));
     this.lanes[0].connect(this.xfade.a);
@@ -50,10 +51,6 @@ export class Voice {
     this.lp = new Tone.Filter(map.timbre.lp[0], 'lowpass');
     this.panner = new Tone.Panner(map.pan);
     this.xfade.chain(this.hp, this.lp, this.panner, this.level, out);
-    // The felt piano: soft upright piano notes behind a low-pass, the "no data" pulse.
-    const felt = new Tone.Filter(1100, 'lowpass');
-    this.piano = new Tone.Sampler({ urls: pianoBuffers, attack: 0.01, release: 0.6 });
-    this.piano.chain(felt, this.panner);
     if (textureBuf) {
       this.texture = new Tone.Gain(0);
       new Tone.Player({ url: textureBuf, loop: true, loopStart: 0.06, loopEnd: textureBuf.duration - 0.06 })
@@ -132,21 +129,41 @@ export class Voice {
     return step;
   }
 
+  /** Tutorial: play `beats` of a constant-value window with its full character (filters, texture), then restore. */
+  demo(win: WindowData, layer: LayerInfo, stepSec: number, beats = 4) {
+    const p = this.build(win, layer);
+    const t0 = Tone.now() + 0.05;
+    this.applyCharacter(p, 0.05, t0);
+    this.texture?.gain.rampTo(p.textureDb > -Infinity ? Tone.dbToGain(p.textureDb) : 0, 0.2, t0);
+    this.level.gain.rampTo(this.gainFor(p), 0.05, t0);
+    return this.playSteps(p.steps.slice(0, beats), stepSec, t0);
+  }
+
+  /** Tutorial: play these steps one per beat (with their visuals) outside the loop. Returns seconds. */
+  playSteps(steps: Step[], stepSec: number, t0 = Tone.now() + 0.05) {
+    steps.forEach((step, k) => {
+      const i = Math.round((k * STEPS) / Math.max(steps.length, 1)) % STEPS; // spread over the window, west to east
+      this.trigger(step, t0 + k * stepSec, stepSec, this.lanes[this.active]);
+      Tone.getDraw().schedule(() => fx.emit({ kind: 'step', layer: this.map.layer, i, step }), t0 + k * stepSec);
+    });
+    return steps.length * stepSec;
+  }
+
+  /** Back to the loop's own character and level after a demo. */
+  restore() { this.applyLevel(0.3); }
+
   /** Play one step outside the loop (tutorial legend). */
   preview(step: Step, time: number, stepSec: number) {
     this.trigger(step, time, stepSec, this.lanes[this.active]);
   }
 
   private trigger(step: Step, time: number, stepSec: number, lane: Tone.Sampler) {
-    if (step.noData) {
-      this.piano.triggerAttackRelease(hz(60 + this.score.keyRoot), stepSec * 0.5, time, 0.25);
-      return;
-    }
+    if (step.noData) return; // missing data is simply silent for this layer
     for (const n of step.notes) lane.triggerAttackRelease(hz(n.midi), Math.max(0.05, n.dur * stepSec), time + n.offset * stepSec, n.vel);
   }
 
   dispose() {
-    [...this.lanes, this.xfade, this.hp, this.lp, this.panner, this.level, this.piano].forEach((n) => n.dispose());
+    [...this.lanes, this.xfade, this.hp, this.lp, this.panner, this.level].forEach((n) => n.dispose());
   }
 }
 
@@ -166,15 +183,22 @@ class AudioEngine {
   /** Called on every bar line, in step with the audio (time travel). */
   onBar: (() => void) | null = null;
   firstLayer: LayerId | null = null;
+  /** Surround field around the window (HRTF + doppler). */
+  field: Field | null = null;
 
   private shots: Buffers = {};
   private reversed: Buffers = {};
   private stack!: Tone.Gain;
   private duck!: Tone.Gain;
   private events!: Tone.Gain;
+  private narration!: Tone.Gain;
   private volume!: Tone.Gain;
   private mono!: Tone.Mono;
   private whooshGain!: Tone.Gain;
+  private whooshPan!: Tone.Panner;
+  /** Motion cue on the whole mix: balance leans towards east/west travel, a high shelf brightens north, darkens south. */
+  private motionPan!: Tone.Panner;
+  private motionTilt!: Tone.Filter;
   private manyTimer = 0;
   private beds: Record<string, Tone.Gain> = {};
   private drone: Tone.Sampler | null = null;
@@ -213,8 +237,12 @@ class AudioEngine {
     this.mono.connect(Tone.getDestination());
     this.stack = new Tone.Gain(Tone.dbToGain(-6));
     this.duck = new Tone.Gain(1);
-    this.stack.chain(this.duck, master);
+    this.motionPan = new Tone.Panner(0);
+    this.motionTilt = new Tone.Filter({ type: 'highshelf', frequency: 2500, gain: 0 });
+    this.stack.chain(this.duck, this.motionTilt, this.motionPan, master);
     this.events = new Tone.Gain(Tone.dbToGain(-4)).connect(master);
+    this.narration = new Tone.Gain(1).connect(master);
+    this.field = new Field(this.duck, () => this.keyRoot);
 
     this.shots = await load(manifest.oneshots);
     for (const name of ['clave', 'framedrum', 'smallbell', 'gong', 'cymbal', 'ratchet', 'thump', 'singingbowl', 'wave', 'whoosh', 'windchime']) {
@@ -226,11 +254,10 @@ class AudioEngine {
       this.reversed.cymbal = r;
     }
 
-    const piano = await load(manifest.instruments.piano ?? {});
     await Promise.all(VOICES.map(async (map) => {
       const bufs = await load(manifest.instruments[map.instrument] ?? {});
       if (!Object.keys(bufs).length) { this.missing.push(`instrument ${map.instrument}`); return; }
-      const v = new Voice(map, bufs, piano, this.stack, this, map.texture ? this.shots[map.texture.sample] : undefined);
+      const v = new Voice(map, bufs, this.stack, this, map.texture ? this.shots[map.texture.sample] : undefined);
       this.voices.set(map.layer, v);
     }));
 
@@ -256,7 +283,8 @@ class AudioEngine {
     }
 
     // Window-moving whoosh: a looping field-recording slice, level follows drag speed.
-    this.whooshGain = new Tone.Gain(0).connect(this.events);
+    this.whooshPan = new Tone.Panner(0).connect(this.events);
+    this.whooshGain = new Tone.Gain(0).connect(this.whooshPan);
     if (this.shots.whoosh) {
       new Tone.Player({ url: this.shots.whoosh, loop: true }).chain(new Tone.Filter(1800, 'bandpass'), this.whooshGain).start();
     }
@@ -276,6 +304,7 @@ class AudioEngine {
     for (const [id, v] of this.voices) {
       const step = v.playStep(i, time, stepSec);
       if (v.enabled) enabled++;
+      if (step) Tone.getDraw().schedule(() => fx.emit({ kind: 'step', layer: id, i, step }), time);
       if (step?.accent && id === this.firstLayer && this.onAccent) {
         const cb = this.onAccent;
         Tone.getDraw().schedule(cb, time);
@@ -289,16 +318,61 @@ class AudioEngine {
         const v = 0.15 + 0.55 * ((this.severity - 0.34) / 0.66);
         this.drone.triggerAttackRelease([hz(low), hz(low + 7)], 4 * stepSec, time, v);
       }
-      if (this.severity > 0.67) {
-        const db = -16 + 10 * ((this.severity - 0.67) / 0.33);
-        this.play('timpani', { at: time, db, lowpass: 900, music: true });
-        this.play('timpani', { at: time + 0.3 * stepSec, db: db - 5, rate: 0.94, lowpass: 900, music: true });
-      }
+      if (this.severity > 0.67) this.heartbeat(time, stepSec, (this.severity - 0.67) / 0.33);
     }
     if (i % 4 === 0 && this.onBar) { const cb = this.onBar; Tone.getDraw().schedule(cb, time); }
-    // No layer on: a quiet felt-piano pulse on each bar so the app is never silent.
-    if (!enabled && i % 4 === 0) this.voices.get(VOICES[0].layer)?.preview({ notes: [], noData: true, accent: false, value: NaN }, time, stepSec);
   }
+
+  /** Timpani heartbeat, strength 0..1, with its visual pulse. */
+  private heartbeat(time: number, stepSec: number, strength: number) {
+    const db = -16 + 10 * strength;
+    this.play('timpani', { at: time, db, lowpass: 900, music: true });
+    this.play('timpani', { at: time + 0.3 * stepSec, db: db - 5, rate: 0.94, lowpass: 900, music: true });
+    Tone.getDraw().schedule(() => fx.emit({ kind: 'heartbeat', strength }), time);
+  }
+
+  /** Tutorial: the severity sounds on their own, drone for two bars, heartbeat in the second. Returns seconds. */
+  demoSeverity(): number {
+    const stepSec = this.stepSeconds();
+    const t = Tone.now() + 0.05;
+    const [low] = scaleNotes(this.keyRoot, 38, 49, [chordAt(2, 0)[0]]);
+    this.drone?.triggerAttackRelease([hz(low), hz(low + 7)], 8 * stepSec, t, 0.6);
+    for (let b = 4; b < 8; b += 2) this.heartbeat(t + b * stepSec, stepSec, 0.8);
+    return 8 * stepSec + 1;
+  }
+
+  private clips = new Map<string, Tone.ToneAudioBuffer>();
+
+  /** Narration clip (pre-recorded neural voice). Ducks the music while it plays. Rejects if the file is missing. */
+  async playClip(url: string): Promise<void> {
+    let buf = this.clips.get(url);
+    if (!buf) {
+      buf = await new Tone.ToneAudioBuffer().load(url);
+      this.clips.set(url, buf);
+    }
+    const b = buf;
+    return new Promise((resolve) => {
+      const src = new Tone.ToneBufferSource({ url: b });
+      const g = new Tone.Gain(Tone.dbToGain(-1)).connect(this.narration);
+      src.connect(g);
+      this.duckSpeech(true);
+      let done = false;
+      const end = () => {
+        if (done) return;
+        done = true;
+        this.clipStop = null;
+        this.duckSpeech(false);
+        src.dispose(); g.dispose();
+        resolve();
+      };
+      src.onended = end;
+      this.clipStop = () => { try { src.stop(); } catch { /* not started */ } end(); };
+      src.start(Tone.immediate());
+    });
+  }
+
+  private clipStop: (() => void) | null = null;
+  stopClip() { this.clipStop?.(); }
 
   get playing() {
     return Tone.getTransport().state === 'started';
@@ -345,6 +419,19 @@ class AudioEngine {
     const rates = [1, 1.19, 0.94, 1.12];
     let k = 0;
     this.manyTimer = window.setInterval(() => this.play('clave', { rate: rates[k++ % 4], db: -30, lowpass: 2000 }), 110);
+  }
+
+  /**
+   * Which way the window is travelling, in window widths per second (east, north). The mix leans into the direction
+   * of travel (left/right balance, up to 60 %) and tilts brighter going north, darker going south (up to 4 dB above
+   * 2.5 kHz); the whoosh pans further. Long ramps keep it smooth. ponytail: tanh(1.5 v) curve tuned by ear.
+   */
+  setMotion(east: number, north: number) {
+    if (!this.motionPan) return;
+    const pan = 0.6 * Math.tanh(1.5 * east);
+    this.motionPan.pan.linearRampTo(pan, 0.35);
+    this.whooshPan.pan.linearRampTo(Math.max(-1, Math.min(1, pan * 1.5)), 0.25);
+    this.motionTilt.gain.linearRampTo(4 * Math.tanh(1.5 * north), 0.35); // linear: dB crosses zero
   }
 
   setMoveSpeed(degPerSec: number) {

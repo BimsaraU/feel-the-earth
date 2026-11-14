@@ -11,6 +11,11 @@ const LAYERS: LayerInfo[] = [
   { id: 'lightning', name: 'Lightning', unit: 'index', unitSpoken: 'on a lightning density index from 0 to 1', min: 0, max: 0.4, scale: 'linear', cadence: '10-day' },
   { id: 'lights', name: 'Night lights', unit: 'index', unitSpoken: 'on a brightness index from 0 to 1', min: 0, max: 0.6, scale: 'linear', cadence: 'annual' },
   { id: 'lightschange', name: 'Night light change 2012 to 2023', unit: 'index', unitSpoken: 'on a scale from minus 1 to plus 1', min: -0.6, max: 0.6, scale: 'linear', cadence: 'static' },
+  { id: 'co2', name: 'Carbon dioxide', unit: 'ppm', unitSpoken: 'parts per million', min: 390, max: 405, scale: 'linear', cadence: 'monthly' },
+  { id: 'airtemp', name: 'Air temperature', unit: 'K', unitSpoken: 'kelvin', min: 201, max: 319, scale: 'linear', cadence: 'monthly' },
+  { id: 'precip', name: 'Precipitation', unit: 'mm/day', unitSpoken: 'millimetres per day', min: 0, max: 20, scale: 'linear', cadence: 'monthly' },
+  { id: 'ndvi', name: 'Vegetation', unit: 'NDVI', unitSpoken: 'on the vegetation index from minus 1 to 1', min: -0.03, max: 0.98, scale: 'linear', cadence: 'monthly' },
+  { id: 'aerosol', name: 'Aerosols', unit: 'AOD', unitSpoken: 'aerosol optical depth', min: 0, max: 0.9, scale: 'linear', cadence: 'monthly' },
 ].map((l) => ({ ...l, id: l.id as LayerId, scale: 'linear' as const, cadence: l.cadence as LayerInfo['cadence'], timeRange: ['2007-01-01', '2023-12-31'] as [string, string], resolutionDeg: 0.5, sourceText: DEMO, demo: true }));
 
 const D2R = Math.PI / 180;
@@ -76,6 +81,16 @@ export function fieldValue(id: LayerId, lat: number, lon: number, d: DayInfo): n
     }
     case 'lightschange':
       return 0.4 * blob(lat, lon, 28, 77, 5) - 0.3 * blob(lat, lon, 49, 2, 4);
+    case 'co2':
+      return 396 + 4 * Math.cos(lat * D2R) + 3 * (drift(3, 20) - 0.5);
+    case 'airtemp':
+      return 250 + 50 * Math.cos(lat * D2R) ** 2 - 10 * Math.sin(lat * D2R) * season;
+    case 'precip':
+      return 14 * (blob(lat, lon, 0, 100, 15) + blob(lat, lon, -3, -60, 12)) * drift(4, 10);
+    case 'ndvi':
+      return 0.8 * (blob(lat, lon, -3, -60, 14) + blob(lat, lon, 0, 20, 12) + blob(lat, lon, 50, 10, 15));
+    case 'aerosol':
+      return 0.8 * blob(lat, lon, 20, 10, 12) + 0.6 * blob(lat, lon, 28, 80, 8);
   }
 }
 

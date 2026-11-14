@@ -46,9 +46,9 @@ export function whereAmI(geo: GeoGrid, lat: number, lon: number, size: number, d
 export interface Heard { layer: LayerInfo; voice: VoiceMapping; mean: number }
 
 export function whatAmIHearing(items: Heard[], ensembleSeverity = 0): string {
-  if (!items.length) return 'No layers are on. You hear a quiet piano pulse. Press 1 to 8 to turn a layer on.';
+  if (!items.length) return 'No layers are on. Press 1 to 9 to turn a layer on.';
   const parts = items.map(({ layer, voice, mean }) => {
-    if (Number.isNaN(mean)) return `${layer.name}: no data in this window. You hear a soft felt piano pulse instead of ${voice.instrumentSpoken}.`;
+    if (Number.isNaN(mean)) return `${layer.name}: no data in this window, so ${voice.instrumentSpoken} is silent here.`;
     return `${layer.name}, ${spokenNumber(mean)} ${layer.unitSpoken}, ${levelWord(norm(mean, layer))}. You hear it as ${voice.instrumentSpoken}. ${voice.hear}`;
   });
   const demo = items.some((i) => i.layer.demo) ? 'Demo data, not NASA data. ' : '';

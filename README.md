@@ -20,7 +20,7 @@ npm run mapping    # regenerate docs/MAPPING.md from src/audio/mapping.ts
 ```
 
 Assets are committed. To rebuild them (needs network):
-`python scripts/prepare_audio.py`, `python scripts/build_geo.py`, `python scripts/build_imagery.py` and `python scripts/build_elevation.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
+`python scripts/prepare_audio.py`, `python scripts/build_narration.py` (Kokoro neural voice for the tour), `python scripts/build_geo.py`, `python scripts/build_imagery.py` and `python scripts/build_elevation.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
 
 ## Keys
 
@@ -32,7 +32,7 @@ Assets are committed. To rebuild them (needs network):
 | , and . / Shift+, and . | Day / month back and forward |
 | W / H | Where am I? / What am I hearing? |
 | G | Arrows turn the globe instead |
-| T | Audio legend (tutorial) |
+| T | Listening tour: narrated guide to every sound and why it sounds that way (Esc ends it) |
 | V | Voice guide on / off (spoken help; captions stay) |
 | Y | Time travel on / off (one step per bar) |
 | M | Menu (sidebar) |

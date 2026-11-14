@@ -1,16 +1,12 @@
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { engine } from '../audio/engine';
 import { HAPTICS, type HapticPattern } from '../audio/mapping';
 
 type Driver = 'capacitor' | 'vibrate' | 'ios-switch' | 'audio' | 'none';
 
-interface CapacitorHaptics { impact(o: { style: 'LIGHT' | 'MEDIUM' | 'HEAVY' }): Promise<void> }
-declare global {
-  interface Window { Capacitor?: { isNativePlatform?(): boolean; Plugins?: { Haptics?: CapacitorHaptics } } }
-}
-
 function detect(): Driver {
-  const cap = window.Capacitor;
-  if (cap?.isNativePlatform?.() && cap.Plugins?.Haptics) return 'capacitor';
+  if (Capacitor.isNativePlatform()) return 'capacitor';
   // Any touch device with the Vibration API. Not a UA check: Chrome on Android tablets sends a desktop
   // user agent by default. Desktop Chrome has vibrate() but no touch points (and no motor).
   if (typeof navigator.vibrate === 'function' && navigator.maxTouchPoints > 0) return 'vibrate';
@@ -72,7 +68,7 @@ export const haptics = {
       if (i % 2 === 0) {
         const at = t;
         if (this.driver === 'capacitor') {
-          setTimeout(() => void window.Capacitor!.Plugins!.Haptics!.impact({ style: ms >= 30 ? 'MEDIUM' : 'LIGHT' }), at);
+          setTimeout(() => void Haptics.impact({ style: ms >= 30 ? ImpactStyle.Medium : ImpactStyle.Light }), at);
         } else {
           engine.play('thump', { at: engine.now() + at / 1000, db: ms >= 30 ? -4 : -10, rate: ms >= 30 ? 0.85 : 1.1 });
         }

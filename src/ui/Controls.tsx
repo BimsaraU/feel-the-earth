@@ -4,7 +4,7 @@ import { engine } from '../audio/engine';
 import { KEYS, levelWord, norm, VOICES } from '../audio/mapping';
 import { placeName, spokenDate, spokenNumber } from '../assist/answers';
 import { say } from '../assist/speech';
-import { runTutorial } from '../assist/tutorial';
+import { runTutorial, skipNarration, stopTutorial } from '../assist/tutorial';
 import {
   askWhat, askWhere, dateBounds, geo, glideStart, glideStop, moveBy, setDate, setSize, setTravelling, sizeDone, stepDate,
   toggleLayer, togglePlay, toggleVoice, type Dir,
@@ -12,7 +12,7 @@ import {
 import type { LayerId } from '../data/types';
 import { haptics } from '../haptics/haptics';
 import { MAX_SIZE, MIN_SIZE, useApp } from '../state';
-import { colour } from './colour';
+import { colour, rampCss } from './colour';
 import { zoomBy } from './Globe';
 import { Wheel } from './Wheel';
 
@@ -70,6 +70,28 @@ function Brand() {
   );
 }
 
+/** Listening tour card: where you are in the tour and what is being said. The caption carries the live text. */
+function TourCard() {
+  const tour = useApp((s) => s.tour);
+  const card = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (card.current) gsap.fromTo(card.current, { opacity: 0, y: 14, filter: 'blur(6px)' }, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' });
+  }, [tour?.i]);
+  if (!tour) return null;
+  return (
+    <div ref={card} className="tour glass" role="region" aria-label="Listening tour">
+      <div className="tour-progress" aria-hidden="true"><span style={{ width: `${((tour.i + 1) / tour.n) * 100}%` }} /></div>
+      <p className="eyebrow">Listening tour · {tour.i + 1} of {tour.n}</p>
+      <h2 className="tour-title">{tour.title}</h2>
+      <p className="tour-text">{tour.text}</p>
+      <div className="buttons">
+        <button type="button" onClick={skipNarration}>Skip</button>
+        <button type="button" onClick={stopTutorial}>End tour <kbd>Esc</kbd></button>
+      </div>
+    </div>
+  );
+}
+
 /** One collapsible sidebar item. */
 function Item({ title, children, open, onToggle }: { title: string; children: ReactNode; open: boolean; onToggle: () => void }) {
   const body = useRef<HTMLDivElement>(null);
@@ -92,7 +114,7 @@ function Listen() {
       <button type="button" onClick={askWhere}>Where am I? <kbd>W</kbd></button>
       <button type="button" onClick={() => void askWhat()}>What am I hearing? <kbd>H</kbd></button>
       <button type="button" onClick={togglePlay} aria-pressed={playing}>{playing ? 'Pause' : 'Play'} <kbd>Space</kbd></button>
-      <button type="button" onClick={() => void runTutorial()}>Audio legend <kbd>T</kbd></button>
+      <button type="button" onClick={() => void runTutorial()}>Listening tour <kbd>T</kbd></button>
       <button type="button" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>V</kbd></button>
       <PushToTalk />
     </div>
@@ -115,7 +137,7 @@ function Layers() {
         ctx.clearRect(0, 0, w, h);
         steps.forEach((s, i) => {
           const v = Number.isNaN(s.value) ? 0.04 : Math.max(0.04, s.value);
-          const [r, g, b] = colour(Number.isNaN(s.value) ? 0 : s.value);
+          const [r, g, b] = colour(Number.isNaN(s.value) ? 0 : s.value, id);
           ctx.fillStyle = i === step ? '#f1fff8' : `rgba(${r},${g},${b},${Number.isNaN(s.value) ? 0.25 : 0.75})`;
           ctx.fillRect(i * bw + 1, h - v * h, bw - 2, v * h);
         });
@@ -171,11 +193,10 @@ function Legend() {
   const { layers, active } = useApp();
   const l = layers.find((x) => x.id === active[active.length - 1]);
   if (!l) return null;
-  const stops = [0, 0.25, 0.5, 0.75, 1].map((t) => `rgb(${colour(t).join(',')}) ${t * 100}%`).join(',');
   return (
     <div className="legend" aria-label={`Colour scale for ${l.name}, ${l.min} to ${l.max} ${l.unitSpoken}`}>
       <span>{l.min}</span>
-      <span className="ramp" style={{ background: `linear-gradient(to right, ${stops})` }} />
+      <span className="ramp" style={{ background: rampCss(l.id) }} />
       <span>{l.max} {l.unit}</span>
       <span className="hatch" aria-hidden="true" /><span>no data</span>
     </div>
@@ -282,6 +303,7 @@ function Settings() {
         </select>
       </label>
       <label className="check"><input type="checkbox" checked={s.mono} onChange={(e) => setSettings({ mono: e.target.checked })} /> Mono mix</label>
+      <label className="check"><input type="checkbox" checked={s.spatial} onChange={(e) => setSettings({ spatial: e.target.checked })} /> Surround field (headphones)</label>
       <label className="check"><input type="checkbox" checked={s.highContrast} onChange={(e) => setSettings({ highContrast: e.target.checked })} /> High contrast</label>
     </div>
   );
@@ -325,6 +347,7 @@ export function Controls() {
   return (
     <div className="hud" ref={hud}>
       <Brand />
+      <TourCard />
       <button type="button" className="menu-button glass" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(!open)}>
         {open ? 'Close' : 'Menu'} <kbd>M</kbd>
       </button>
