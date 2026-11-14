@@ -9,7 +9,6 @@ export interface Settings {
   voice: boolean;
   haptics: boolean;
   hapticAccents: boolean;
-  tempo: number;
   /** Navigation speed, window widths per second. */
   navSpeed: number;
   keyRoot: number; // pitch class, 2 = D
@@ -29,6 +28,8 @@ export interface AppState {
   playing: boolean;
   dragging: boolean;
   globeMode: boolean;
+  /** Time travel: the date advances one step per bar while the loop plays. */
+  travelling: boolean;
   live: string;
   /** Window mean per active layer, from the last loop regeneration. */
   means: Partial<Record<LayerId, number>>;
@@ -40,7 +41,7 @@ export interface AppState {
 const SETTINGS_KEY = 'fte-settings';
 const defaults: Settings = {
   masterVolume: 0.7, layerDb: {}, speechRate: 1.1, voice: true, haptics: true, hapticAccents: false,
-  tempo: 72, navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false,
+  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false,
 };
 
 function loadSettings(): Settings {
@@ -55,14 +56,15 @@ export const useApp = create<AppState>((set) => ({
   started: false,
   loading: false,
   layers: [],
-  active: ['temperature'],
+  active: ['sst'],
   lat: 7.9,
   lon: 80.7,
   size: 10,
-  date: new Date().toISOString().slice(0, 10),
+  date: '2007-11-14', // inside the sea surface temperature record (2007-03-25 .. 2008-03-03)
   playing: false,
   dragging: false,
   globeMode: false,
+  travelling: false,
   live: '',
   means: {},
   settings: loadSettings(),

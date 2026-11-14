@@ -59,6 +59,7 @@ export const haptics = {
   /** Fire now, at the event time; never wait for the sound to finish. */
   pulse(name: HapticPattern) {
     if (!this.enabled || this.driver === 'none') return;
+    if (name === 'tick' && this.driver === 'audio') return; // wheel detents: real haptics only, no thump stream
     const pattern = HAPTICS[name];
     if (this.driver === 'vibrate' && navigator.vibrate(pattern)) return;
     if (this.driver === 'ios-switch') {

@@ -17,10 +17,11 @@ describe('assist answers', () => {
   });
 
   it('what am I hearing', () => {
-    const wind = layers.find((l) => l.id === 'wind')!;
-    expect(whatAmIHearing([{ layer: wind, voice: voiceFor('wind'), mean: 24 }])).toBe(
-      'Demo data, not NASA data. Wind speed, 24 metres per second, high. You hear it as the flute and the wind. More and louder flute notes, and more wind noise, mean stronger wind. The music is calm. The scan runs west to east; higher notes are further north.');
-    expect(whatAmIHearing([{ layer: wind, voice: voiceFor('wind'), mean: NaN }])).toContain('no data');
+    const sst = layers.find((l) => l.id === 'sst')!;
+    expect(whatAmIHearing([{ layer: sst, voice: voiceFor('sst'), mean: 24 }])).toBe(
+      'Demo data, not NASA data. Sea surface temperature, 24 degrees Celsius, high. You hear it as the cello section. Louder means warmer water; cold water sounds thin and icy, warm water dark and full. The music is calm. The scan runs west to east; higher notes are further north.');
+    expect(whatAmIHearing([{ layer: sst, voice: voiceFor('sst'), mean: NaN }])).toContain('no data');
+    expect(whatAmIHearing([{ layer: { ...sst, demo: false }, voice: voiceFor('sst'), mean: 24 }])).not.toContain('Demo');
   });
 
   it('formats numbers', () => {

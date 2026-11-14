@@ -45,6 +45,7 @@ async function boot() {
   haptics.init();
   applySettings();
   useApp.subscribe((s, prev) => { if (s.settings !== prev.settings) applySettings(prev.settings.keyRoot !== s.settings.keyRoot); });
+  engine.onBar = () => { if (st().travelling) travelStep(); };
   engine.onAccent = () => { if (st().settings.hapticAccents) haptics.pulse('accent'); };
   syncVoices();
   updateSurface();
@@ -60,7 +61,6 @@ async function boot() {
 function applySettings(keyChanged = false) {
   const s = st().settings;
   engine.setMasterVolume(s.masterVolume);
-  engine.setTempo(s.tempo);
   engine.setMono(s.mono);
   engine.keyRoot = s.keyRoot;
   for (const [id, v] of engine.voices) v.setLevel(s.layerDb[id] ?? 0);
@@ -286,7 +286,15 @@ export function toggleLayer(id: LayerId) {
     return;
   } else {
     st().set({ active: [...active, id] });
-    void say(`${info.name} on, ${v.instrumentSpoken}.${info.demo ? ' Demo data.' : ''}`);
+    const [lo, hi] = info.timeRange;
+    const { date } = st();
+    let moved = '';
+    if (date < lo || date > hi) {
+      const to = date < lo ? lo : hi;
+      st().set({ date: to });
+      moved = ` Its record runs from ${spokenDate(lo)} to ${spokenDate(hi)}, so the date moved to ${spokenDate(to)}.`;
+    }
+    void say(`${info.name} on, ${v.instrumentSpoken}.${info.demo ? ' Demo data.' : ''}${moved}`);
   }
   syncVoices();
   scheduleRegen();
@@ -302,17 +310,62 @@ export function stepDate(days: number, months = 0) {
   setDate(d.toISOString().slice(0, 10), months ? 'month' : 'day', layers);
 }
 
-export function setDate(iso: string, kind: 'day' | 'month' = 'day', layers = st().layers) {
-  const [lo, hi] = layers[0]?.timeRange ?? [iso, iso];
+/** Earliest start and latest end over all layers. */
+export function dateBounds(layers = st().layers): [string, string] {
+  if (!layers.length) return ['2007-01-01', '2023-12-31'];
+  return [layers.reduce((a, l) => (l.timeRange[0] < a ? l.timeRange[0] : a), '9999'), layers.reduce((a, l) => (l.timeRange[1] > a ? l.timeRange[1] : a), '0000')];
+}
+
+export function setDate(iso: string, kind: 'day' | 'month' | 'quiet' = 'day', layers = st().layers) {
+  const [lo, hi] = dateBounds(layers);
   if (iso < lo || iso > hi) {
     void say(`No data ${iso < lo ? 'before' : 'after'} ${spokenDate(iso < lo ? lo : hi)}.`);
     return;
   }
   st().set({ date: iso });
-  engine.play(kind === 'month' ? 'windchime' : 'ratchet', { db: kind === 'month' ? -6 : 0 });
-  haptics.pulse('timeStep');
+  if (kind !== 'quiet') {
+    engine.play(kind === 'month' ? 'windchime' : 'ratchet', { db: kind === 'month' ? -6 : -4 });
+    haptics.pulse('timeStep');
+  }
   announce(spokenDate(iso));
   scheduleRegen();
+}
+
+// ---------- time travel ----------
+
+/** One step of the finest cadence among the active layers: a day, ten days or a year. */
+function travelStepSize(): { days: number; months: number } {
+  const cad = st().active.map((id) => layerInfo(id)?.cadence);
+  if (cad.includes('daily')) return { days: 1, months: 0 };
+  if (cad.includes('10-day')) return { days: 10, months: 0 };
+  return { days: 0, months: 12 };
+}
+
+function travelStep() {
+  const { date } = st();
+  const { days, months } = travelStepSize();
+  const d = new Date(date + 'T00:00:00Z');
+  d.setUTCMonth(d.getUTCMonth() + months);
+  d.setUTCDate(d.getUTCDate() + days);
+  const next = d.toISOString().slice(0, 10);
+  // Stop at the end of the record of the layers being heard.
+  const end = st().active.map((id) => layerInfo(id)?.timeRange[1] ?? '').sort().pop() ?? dateBounds()[1];
+  if (next > end) { setTravelling(false); void say('End of the record.'); return; }
+  engine.play('ratchet', { db: -14 });
+  setDate(next, 'quiet');
+}
+
+/** Time travel: while on, every bar of the loop moves the date one step forward. */
+export function setTravelling(on: boolean) {
+  st().set({ travelling: on });
+  if (on && !st().playing) togglePlay();
+  const { days, months } = travelStepSize();
+  const unit = months ? 'a year' : days === 10 ? 'ten days' : 'a day';
+  void say(on ? `Time travel on: ${unit} per bar.` : 'Time travel off.');
+}
+
+export function isGliding() {
+  return glide.raf !== 0;
 }
 
 export function sayDate() {

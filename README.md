@@ -6,7 +6,7 @@ Move a small listening window over a globe and hear the Earth data inside it as 
 played by recorded instruments. Borders, coasts and named lines are earcons and haptic pulses. Time steps by day
 or month. Everything works by keyboard, by touch and with a screen reader.
 
-**Stage 1 plays DEMO DATA, not NASA data.** It is labelled on screen and in speech.
+Data: NASA Earth Information Center visualisations (sea surface temperature, lightning, night lights, night-light change), see docs/EIC_LAYERS.md. Rebuild with `python pipeline/build_eic.py`.
 
 ## Run
 
@@ -28,12 +28,14 @@ Assets are committed. To rebuild them (needs network):
 |---|---|
 | Arrows (hold) / Shift+arrows | Glide the window; a tap moves at least a quarter / full width. Speed in Navigate |
 | + / - | Grow / shrink window (2 to 30 degrees) |
-| 1 to 8 | Toggle layers (up to 4) |
+| 1 to 4 | Toggle layers |
 | , and . / Shift+, and . | Day / month back and forward |
 | W / H | Where am I? / What am I hearing? |
 | G | Arrows turn the globe instead |
 | T | Audio legend (tutorial) |
 | V | Voice guide on / off (spoken help; captions stay) |
+| Y | Time travel on / off (one step per bar) |
+| M | Menu (sidebar) |
 | Space | Play / pause |
 | Esc | Stop speech and tutorial |
 

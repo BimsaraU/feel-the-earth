@@ -1,5 +1,5 @@
 import { VOICES } from '../audio/mapping';
-import { askWhat, askWhere, toggleVoice, glideStart, glideStop, resize, stepDate, toggleLayer, togglePlay } from '../controller';
+import { askWhat, askWhere, setTravelling, toggleVoice, glideStart, glideStop, resize, stepDate, toggleLayer, togglePlay } from '../controller';
 import { say } from '../assist/speech';
 import { runTutorial, stopTutorial } from '../assist/tutorial';
 import { useApp } from '../state';
@@ -31,6 +31,8 @@ export function onKey(e: KeyboardEvent) {
   else if (e.code === 'KeyH') void askWhat();
   else if (e.code === 'KeyT') void runTutorial();
   else if (e.code === 'KeyV') toggleVoice();
+  else if (e.code === 'KeyY') setTravelling(!useApp.getState().travelling);
+  else if (e.code === 'KeyM') window.dispatchEvent(new Event('fte-menu'));
   else if (e.code === 'KeyG') {
     const globeMode = !useApp.getState().globeMode;
     useApp.getState().set({ globeMode });

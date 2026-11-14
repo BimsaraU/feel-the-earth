@@ -8,14 +8,10 @@ Spans read "at layer minimum → at layer maximum" of the window mean.
 
 | Key | Layer | Range | Scale | Voice | Role | MIDI register | High-pass Hz | Low-pass Hz | Resonance Q | Texture dB | Dangerous when | Meaning |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | Surface air temperature | -50 to 45 °C | linear | cello | melody | 45-69 | 220 → 60 | 9000 → 2400 | 0.7 |  | high (t 0.72 → 0.95): heat | Louder means warmer air; cold air sounds thin and icy, hot air dark and full. |
-| 2 | Wind speed | 0 to 30 m/s | linear | flute | arp | 74-91 | 500 → 300 | 4000 → 10000 | 0.7 | windbed -40 → -16 | high (t 0.6 → 0.9): storm winds | More and louder flute notes, and more wind noise, mean stronger wind. |
-| 3 | Precipitation | 0.1 to 60 mm/day | log | harp | arp | 62-86 | 200 | 5000 → 8000 | 0.7 | rain -42 → -14 | high (t 0.7 → 0.95): flooding rain | More harp plucks and louder rain mean heavier rain. |
-| 4 | Carbon dioxide | 395 to 435 ppm | linear | contrabass | bass | 28-43 | 35 | 1600 → 450 | 0.7 → 5 |  | high (t 0.35 → 0.9): carbon dioxide | Louder, darker and more growling means more carbon dioxide. |
-| 5 | Carbon monoxide | 40 to 300 ppb | linear | clarinet | pad | 50-67 | 150 | 4000 → 1600 | 0.7 → 3 |  | high (t 0.45 → 0.9): carbon monoxide | Louder and duller means more carbon monoxide. |
-| 6 | Nitrogen dioxide | 1 to 300 µmol/m² | log | oboe | pad | 62-77 | 300 | 7000 → 3200 | 0.7 → 7 |  | high (t 0.4 → 0.85): nitrogen dioxide | Louder and harsher, more nasal, means more nitrogen dioxide. |
-| 7 | Ozone column | 120 to 480 DU | linear | glock | color | 79-98 | 1200 | 6000 → 12000 | 0.7 |  | low (t 0.35 → 0.05): ozone loss | More and brighter bells mean a thicker ozone layer; an ozone hole falls silent. |
-| 8 | Fine particulate matter, PM2.5 | 1 to 200 µg/m³ | log | marimba | pulse | 45-60 | 80 | 5000 → 700 | 0.7 → 1.5 |  | high (t 0.45 → 0.85): smoky, dusty air | Louder and more muffled, as if through smog, means dirtier air. |
+| 1 | Sea surface temperature | 0 to 32 °C | linear | cello | melody | 45-69 | 240 → 60 | 9000 → 2400 | 0.7 |  | high (t 0.86 → 0.97): marine heat | Louder means warmer water; cold water sounds thin and icy, warm water dark and full. |
+| 2 | Lightning | 0 to 0.4 index | linear | glock | color | 79-98 | 900 | 7000 → 12000 | 0.7 | rain -44 → -16 | high (t 0.3 → 0.75): thunderstorms | Each bright strike is a lightning hot spot; more strikes and louder rain mean more lightning. |
+| 3 | Night lights | 0 to 0.6 index | linear | harp | arp | 62-86 | 200 | 3500 → 9000 | 0.7 |  | high (t 2 → 3): none | More and brighter harp notes mean more night light from towns and cities. |
+| 4 | Night light change 2012 to 2023 | -0.6 to 0.6 index | linear | clarinet | pad | 50-67 | 150 | 1200 → 5000 | 0.7 |  | high (t 2 → 3): none | Bright and loud means new lights since 2012; dark and quiet means lights went out. |
 
 ## Window features (all layers)
 
@@ -61,3 +57,4 @@ Spans read "at layer minimum → at layer maximum" of the window mean.
 | timeStep | 8 |
 | accent | 10 |
 | test | 40, 60, 40 |
+| tick | 6 |

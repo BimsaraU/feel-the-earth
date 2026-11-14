@@ -1,21 +1,22 @@
 import { gsap } from 'gsap';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { engine } from '../audio/engine';
 import { KEYS, levelWord, norm, VOICES } from '../audio/mapping';
 import { placeName, spokenDate, spokenNumber } from '../assist/answers';
 import { say } from '../assist/speech';
 import { runTutorial } from '../assist/tutorial';
-import { askWhat, askWhere, geo, toggleVoice, glideStart, glideStop, moveBy, setDate, setSize, sizeDone, stepDate, toggleLayer, togglePlay, type Dir } from '../controller';
+import {
+  askWhat, askWhere, dateBounds, geo, glideStart, glideStop, moveBy, setDate, setSize, setTravelling, sizeDone, stepDate,
+  toggleLayer, togglePlay, toggleVoice, type Dir,
+} from '../controller';
 import type { LayerId } from '../data/types';
-import { MAX_SIZE, MIN_SIZE, useApp } from '../state';
 import { haptics } from '../haptics/haptics';
+import { MAX_SIZE, MIN_SIZE, useApp } from '../state';
 import { colour } from './colour';
 import { zoomBy } from './Globe';
+import { Wheel } from './Wheel';
 
 const DAY = 86400000;
-const SHORT: Partial<Record<LayerId, string>> = {
-  temperature: 'Temperature', wind: 'Wind', precipitation: 'Rain', co2: 'CO₂', co: 'CO', no2: 'NO₂', o3: 'Ozone', pm25: 'PM2.5',
-};
 const toDays = (iso: string) => Math.round(Date.parse(iso + 'T00:00:00Z') / DAY);
 const fromDays = (d: number) => new Date(d * DAY).toISOString().slice(0, 10);
 const coord = (v: number, p: string, n: string) => `${Math.abs(v).toFixed(2)}° ${v >= 0 ? p : n}`;
@@ -43,16 +44,16 @@ function PushToTalk() {
   };
   const stop = () => { rec.current?.stop(); setOn(false); };
   return (
-    <button type="button" className="tool" aria-pressed={on} onPointerDown={start} onPointerUp={stop} onPointerLeave={() => on && stop()}
+    <button type="button" aria-pressed={on} onPointerDown={start} onPointerUp={stop} onPointerLeave={() => on && stop()}
       onKeyDown={(e) => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (on) stop(); else start(); } }}>
       {on ? 'Listening…' : 'Hold to ask'}
     </button>
   );
 }
 
-/** Big place title, crossfades when the place under the window changes. */
+/** Place title over the map, crossfades when the place under the window changes. */
 function Brand() {
-  const { lat, lon, layers, live, size } = useApp();
+  const { lat, lon, layers, live, size, date, travelling } = useApp();
   const place = geo ? placeName(geo, lat, lon).replace(/^the /, '') : '';
   const title = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
@@ -60,33 +61,47 @@ function Brand() {
   }, [place]);
   return (
     <header className="brand">
-      <p className="eyebrow">Feel the Earth {layers.some((l) => l.demo) && <strong className="demo">DEMO DATA, not NASA data</strong>}</p>
+      <p className="eyebrow">Feel the Earth · NASA EIC data {layers.some((l) => l.demo) && <strong className="demo">DEMO DATA, not NASA data</strong>}</p>
       <h1 ref={title}>{place}</h1>
       <p className="coords">{coord(lat, 'N', 'S')} · {coord(lon, 'E', 'W')} · window {Math.round(size * 10) / 10}°</p>
+      <p className="when-line">{spokenDate(date)}{travelling ? ' · time travel' : ''}</p>
       <p className="caption" role="status" aria-live="polite">{live}</p>
     </header>
   );
 }
 
-function Toolbar({ onSettings }: { onSettings: () => void }) {
-  const playing = useApp((s) => s.playing);
-  const voice = useApp((s) => s.settings.voice);
+/** One collapsible sidebar item. */
+function Item({ title, children, open, onToggle }: { title: string; children: ReactNode; open: boolean; onToggle: () => void }) {
+  const body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (body.current) gsap.to(body.current, { height: open ? 'auto' : 0, opacity: open ? 1 : 0, duration: 0.4, ease: 'power3.inOut' });
+  }, [open]);
   return (
-    <nav className="tools glass" aria-label="Actions">
-      <button type="button" className="tool" onClick={askWhere}>Where am I? <kbd>W</kbd></button>
-      <button type="button" className="tool" onClick={() => void askWhat()}>What am I hearing? <kbd>H</kbd></button>
-      <button type="button" className="tool" onClick={togglePlay} aria-pressed={playing}>{playing ? 'Pause' : 'Play'} <kbd>Space</kbd></button>
-      <button type="button" className="tool" onClick={() => void runTutorial()}>Legend <kbd>T</kbd></button>
-      <PushToTalk />
-      <button type="button" className="tool" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>V</kbd></button>
-      <button type="button" className="tool" onClick={onSettings}>Settings</button>
-    </nav>
+    <section className="item">
+      <h2><button type="button" className="item-head" aria-expanded={open} onClick={onToggle}>{title}<span className="sign" aria-hidden="true">{open ? '−' : '+'}</span></button></h2>
+      <div ref={body} className="collapse" inert={!open} style={{ height: 0, opacity: 0 }}>{children}</div>
+    </section>
   );
 }
 
-/** Live readout per active layer: window mean, and the 16 scan columns with the scan line lit. */
-function Hearing() {
-  const { active, layers, means } = useApp();
+function Listen() {
+  const playing = useApp((s) => s.playing);
+  const voice = useApp((s) => s.settings.voice);
+  return (
+    <div className="buttons">
+      <button type="button" onClick={askWhere}>Where am I? <kbd>W</kbd></button>
+      <button type="button" onClick={() => void askWhat()}>What am I hearing? <kbd>H</kbd></button>
+      <button type="button" onClick={togglePlay} aria-pressed={playing}>{playing ? 'Pause' : 'Play'} <kbd>Space</kbd></button>
+      <button type="button" onClick={() => void runTutorial()}>Audio legend <kbd>T</kbd></button>
+      <button type="button" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>V</kbd></button>
+      <PushToTalk />
+    </div>
+  );
+}
+
+/** Layer toggles with a live readout: window mean and the 16 scan columns, scan position lit. */
+function Layers() {
+  const { layers, active, means } = useApp();
   const canvases = useRef(new Map<LayerId, HTMLCanvasElement>());
   useEffect(() => {
     let raf = 0;
@@ -111,25 +126,31 @@ function Hearing() {
     return () => cancelAnimationFrame(raf);
   }, []);
   return (
-    <section className="card hearing glass" aria-label="Now hearing">
-      <h2>Now hearing</h2>
-      {!active.length && <p className="muted">No layer on. Press 1 to 8.</p>}
-      {active.map((id) => {
-        const l = layers.find((x) => x.id === id);
-        const v = VOICES.find((x) => x.layer === id)!;
+    <div className="layer-list">
+      {VOICES.map((v) => {
+        const l = layers.find((x) => x.id === v.layer);
         if (!l) return null;
-        const m = means[id];
-        const has = m !== undefined && !Number.isNaN(m);
+        const on = active.includes(v.layer);
+        const m = means[v.layer];
+        const has = on && m !== undefined && !Number.isNaN(m);
         return (
-          <div key={id} className="reading">
-            <p className="label">{l.name} · {v.instrument}</p>
-            <p className="value"><Counter value={has ? m : NaN} /> <span className="unit">{has ? l.unit : ''}</span>
-              <span className="level">{has ? levelWord(norm(m, l)) : 'no data'}</span></p>
-            <canvas aria-hidden="true" width={256} height={36} ref={(c) => { if (c) canvases.current.set(id, c); else canvases.current.delete(id); }} />
+          <div key={v.layer} className={`layer ${on ? 'on' : ''}`}>
+            <button type="button" className="chip" aria-pressed={on} onClick={() => toggleLayer(v.layer)}>
+              <kbd>{v.key}</kbd>
+              <span>{l.name}<small>{v.instrument} · {spokenDate(l.timeRange[0]).replace(/^\d+ /, '')} to {spokenDate(l.timeRange[1]).replace(/^\d+ /, '')}</small></span>
+            </button>
+            {on && (
+              <div className="reading">
+                <p className="value"><Counter value={has ? m! : NaN} /> <span className="unit">{has ? l.unit : ''}</span>
+                  <span className="level">{has ? levelWord(norm(m!, l)) : 'no data at this date'}</span></p>
+                <canvas aria-hidden="true" width={256} height={30} ref={(c) => { if (c) canvases.current.set(v.layer, c); else canvases.current.delete(v.layer); }} />
+              </div>
+            )}
           </div>
         );
       })}
-    </section>
+      <Legend />
+    </div>
   );
 }
 
@@ -144,29 +165,6 @@ function Counter({ value }: { value: number }) {
     gsap.to(shown.current, { v: value, duration: 0.8, ease: 'power2.out', onUpdate: () => { if (el.current) el.current.textContent = spokenNumber(shown.current.v).replace('minus ', '−'); } });
   }, [value]);
   return <span ref={el} />;
-}
-
-function Layers() {
-  const { layers, active } = useApp();
-  return (
-    <section className="card layers glass" aria-label="Layers">
-      <h2>Layers <span className="muted">1–8</span></h2>
-      <div className="chips">
-        {VOICES.map((v) => {
-          const l = layers.find((x) => x.id === v.layer);
-          if (!l) return null;
-          const on = active.includes(v.layer);
-          return (
-            <button key={v.layer} type="button" className="chip" aria-pressed={on} onClick={() => toggleLayer(v.layer)}>
-              <kbd>{v.key}</kbd>
-              <span>{SHORT[v.layer] ?? l.name}</span>
-            </button>
-          );
-        })}
-      </div>
-      <Legend />
-    </section>
-  );
 }
 
 function Legend() {
@@ -184,6 +182,29 @@ function Legend() {
   );
 }
 
+function Time() {
+  const { date, layers, travelling } = useApp();
+  const [lo, hi] = dateBounds(layers);
+  return (
+    <div>
+      <Wheel label="Date" value={toDays(date)} min={toDays(lo)} max={toDays(hi)} step={1} pxPerStep={5}
+        format={(d) => spokenDate(fromDays(d))} onChange={(d) => setDate(fromDays(d), 'quiet')} />
+      <div className="buttons row">
+        <button type="button" onClick={() => stepDate(0, -12)} aria-label="Back one year">−1 y</button>
+        <button type="button" onClick={() => stepDate(0, -1)} aria-label="Back one month">−1 m</button>
+        <button type="button" onClick={() => stepDate(-1)} aria-label="Back one day">−1 d</button>
+        <button type="button" onClick={() => stepDate(1)} aria-label="Forward one day">+1 d</button>
+        <button type="button" onClick={() => stepDate(0, 1)} aria-label="Forward one month">+1 m</button>
+        <button type="button" onClick={() => stepDate(0, 12)} aria-label="Forward one year">+1 y</button>
+      </div>
+      <button type="button" className="wide" aria-pressed={travelling} onClick={() => setTravelling(!travelling)}>
+        Time travel {travelling ? 'on' : 'off'} <kbd>Y</kbd>
+      </button>
+      <p className="muted small">Time travel moves the date forward one step per bar: a day for sea temperature, ten days for lightning, a year for night lights.</p>
+    </div>
+  );
+}
+
 /** Press-and-hold glide buttons; keyboard activation does one step. */
 function DirButton({ dir, label, area }: { dir: Dir; label: string; area: string }) {
   return (
@@ -196,36 +217,24 @@ function DirButton({ dir, label, area }: { dir: Dir; label: string; area: string
   );
 }
 
-function Navigate() {
+function WindowControls() {
   const { size, settings, setSettings } = useApp();
-  const [open, setOpen] = useState(false);
-  const body = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (body.current) gsap.to(body.current, { height: open ? 'auto' : 0, opacity: open ? 1 : 0, duration: 0.45, ease: 'power3.inOut' });
-  }, [open]);
   return (
-    <section className="card nav glass" aria-label="Navigate">
-      <h2><button type="button" className="disclose" aria-expanded={open} onClick={() => setOpen(!open)}>Navigate</button></h2>
-      <div ref={body} className="collapse" inert={!open}>
-        <label className="field">Window size <output>{Math.round(size * 10) / 10}°</output>
-          <input type="range" min={MIN_SIZE} max={MAX_SIZE} step={0.5} value={size} aria-valuetext={`${Math.round(size)} degrees`}
-            onChange={(e) => setSize(+e.target.value, false)} onPointerUp={sizeDone} onKeyUp={sizeDone} />
-        </label>
-        <label className="field">Navigation speed <output>{settings.navSpeed.toFixed(2)} widths/s</output>
-          <input type="range" min={0.1} max={2} step={0.05} value={settings.navSpeed} aria-valuetext={`${settings.navSpeed.toFixed(2)} window widths per second`}
-            onChange={(e) => setSettings({ navSpeed: +e.target.value })} />
-        </label>
-        <div className="pad">
-          <DirButton dir="n" label="north" area="n" />
-          <DirButton dir="w" label="west" area="w" />
-          <DirButton dir="e" label="east" area="e" />
-          <DirButton dir="s" label="south" area="s" />
-          <button type="button" style={{ gridArea: 'zi' }} onClick={() => zoomBy(1)} aria-label="Zoom in">＋</button>
-          <button type="button" style={{ gridArea: 'zo' }} onClick={() => zoomBy(-1)} aria-label="Zoom out">−</button>
-        </div>
-        <TouchPad />
+    <div>
+      <Wheel label="Window size" value={size} min={MIN_SIZE} max={MAX_SIZE} step={0.5} format={(v) => `${v} degrees`}
+        onChange={(v) => setSize(v, false)} onCommit={sizeDone} />
+      <Wheel label="Navigation speed" value={settings.navSpeed} min={0.1} max={2} step={0.05}
+        format={(v) => `${v.toFixed(2)} window widths per second`} onChange={(v) => setSettings({ navSpeed: Math.round(v * 100) / 100 })} />
+      <div className="pad">
+        <DirButton dir="n" label="north" area="n" />
+        <DirButton dir="w" label="west" area="w" />
+        <DirButton dir="e" label="east" area="e" />
+        <DirButton dir="s" label="south" area="s" />
+        <button type="button" style={{ gridArea: 'zi' }} onClick={() => zoomBy(1)} aria-label="Zoom in">＋</button>
+        <button type="button" style={{ gridArea: 'zo' }} onClick={() => zoomBy(-1)} aria-label="Zoom out">−</button>
       </div>
-    </section>
+      <TouchPad />
+    </div>
   );
 }
 
@@ -251,53 +260,22 @@ function TouchPad() {
   );
 }
 
-function TimeBar() {
-  const { date, layers } = useApp();
-  const [lo, hi] = layers[0]?.timeRange ?? [date, date];
-  return (
-    <section className="timebar glass" aria-label="Date">
-      <button type="button" onClick={() => stepDate(0, -1)} aria-label="Back one month">«</button>
-      <button type="button" onClick={() => stepDate(-1)} aria-label="Back one day">‹</button>
-      <div className="when">
-        <span className="date">{spokenDate(date)}</span>
-        <label className="slider"><span className="sr-only">Date</span>
-          <input type="range" min={toDays(lo)} max={toDays(hi)} value={toDays(date)} aria-valuetext={spokenDate(date)}
-            onChange={(e) => setDate(fromDays(Number(e.target.value)))} />
-        </label>
-      </div>
-      <button type="button" onClick={() => stepDate(1)} aria-label="Forward one day">›</button>
-      <button type="button" onClick={() => stepDate(0, 1)} aria-label="Forward one month">»</button>
-    </section>
-  );
-}
-
-function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function Settings() {
   const { settings: s, setSettings, layers } = useApp();
-  const el = useRef<HTMLElement>(null);
-  useLayoutEffect(() => {
-    if (!el.current) return;
-    gsap.to(el.current, { xPercent: open ? 0 : 110, autoAlpha: open ? 1 : 0, duration: 0.5, ease: 'power3.inOut' });
-    if (open) el.current.querySelector<HTMLElement>('button')?.focus();
-  }, [open]);
   return (
-    <aside ref={el} className="drawer glass" aria-label="Settings" style={{ visibility: 'hidden' }}>
-      <h2>Settings <button type="button" className="tool" onClick={onClose}>Close</button></h2>
-      <label className="field">Master volume <input type="range" min={0} max={1} step={0.05} value={s.masterVolume} onChange={(e) => setSettings({ masterVolume: +e.target.value })} /></label>
-      <details>
-        <summary>Layer volumes</summary>
-        {VOICES.map((v) => (
-          <label key={v.layer} className="field">{layers.find((l) => l.id === v.layer)?.name}
-            <input type="range" min={-18} max={6} step={1} value={s.layerDb[v.layer] ?? 0} aria-valuetext={`${s.layerDb[v.layer] ?? 0} decibels`}
-              onChange={(e) => setSettings({ layerDb: { ...s.layerDb, [v.layer]: +e.target.value } })} />
-          </label>
-        ))}
-      </details>
-      <label className="field">Speech rate <input type="range" min={0.6} max={1.8} step={0.1} value={s.speechRate} onChange={(e) => setSettings({ speechRate: +e.target.value })} /></label>
-      <label className="check"><input type="checkbox" checked={s.voice} onChange={(e) => setSettings({ voice: e.target.checked })} /> Voice guide: spoken help (off if your screen reader speaks)</label>
+    <div>
+      <Wheel label="Master volume" value={s.masterVolume} min={0} max={1} step={0.05} format={(v) => `${Math.round(v * 100)} percent`}
+        onChange={(v) => setSettings({ masterVolume: v })} />
+      {VOICES.map((v) => (
+        <Wheel key={v.layer} label={`${layers.find((l) => l.id === v.layer)?.name ?? v.layer} volume`} value={s.layerDb[v.layer] ?? 0}
+          min={-18} max={6} step={1} format={(x) => `${x > 0 ? '+' : ''}${x} dB`}
+          onChange={(x) => setSettings({ layerDb: { ...useApp.getState().settings.layerDb, [v.layer]: x } })} />
+      ))}
+      <Wheel label="Speech rate" value={s.speechRate} min={0.6} max={1.8} step={0.1} format={(v) => `${v.toFixed(1)} times`}
+        onChange={(v) => setSettings({ speechRate: Math.round(v * 10) / 10 })} />
       <label className="check"><input type="checkbox" checked={s.haptics} onChange={(e) => setSettings({ haptics: e.target.checked })} /> Haptics</label>
-      <button type="button" className="tool" onClick={() => { haptics.pulse('test'); void say(`Haptics use ${haptics.describe()}.`); }}>Test haptics</button>
+      <button type="button" className="wide" onClick={() => { haptics.pulse('test'); void say(`Haptics use ${haptics.describe()}.`); }}>Test haptics</button>
       <label className="check"><input type="checkbox" checked={s.hapticAccents} onChange={(e) => setSettings({ hapticAccents: e.target.checked })} /> Pulse on loop accents</label>
-      <label className="field">Tempo {s.tempo} bpm <input type="range" min={50} max={110} step={1} value={s.tempo} onChange={(e) => setSettings({ tempo: +e.target.value })} /></label>
       <label className="field">Key
         <select value={s.keyRoot} onChange={(e) => setSettings({ keyRoot: +e.target.value })}>
           {KEYS.map((k, i) => <option key={k} value={i}>{k}</option>)}
@@ -305,29 +283,56 @@ function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void 
       </label>
       <label className="check"><input type="checkbox" checked={s.mono} onChange={(e) => setSettings({ mono: e.target.checked })} /> Mono mix</label>
       <label className="check"><input type="checkbox" checked={s.highContrast} onChange={(e) => setSettings({ highContrast: e.target.checked })} /> High contrast</label>
-    </aside>
+    </div>
   );
 }
 
+function About() {
+  const layers = useApp((s) => s.layers);
+  return (
+    <div className="about">
+      {layers.map((l) => <p key={l.id}><strong>{l.name}.</strong> {l.sourceText}</p>)}
+      <p className="muted small">Values are recovered from the colours of NASA Scientific Visualization Studio movies made for the Earth Information Center. They are relative where the units say "index".</p>
+    </div>
+  );
+}
+
+const ITEMS = ['Listen', 'Layers', 'Time', 'Window', 'Settings', 'About the data'] as const;
+
 export function Controls() {
-  const [settings, setSettingsOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [item, setItem] = useState<(typeof ITEMS)[number] | null>('Layers');
+  const bar = useRef<HTMLElement>(null);
   const hud = useRef<HTMLDivElement>(null);
+
   useLayoutEffect(() => {
-    if (hud.current) gsap.from(hud.current.querySelectorAll('.brand, .tools, .card, .timebar'), { opacity: 0, y: 18, filter: 'blur(8px)', duration: 0.9, stagger: 0.07, ease: 'power3.out', clearProps: 'opacity,filter,transform' });
+    if (hud.current) gsap.from(hud.current.querySelectorAll('.brand, .menu-button'), { opacity: 0, y: 18, filter: 'blur(8px)', duration: 0.9, stagger: 0.1, ease: 'power3.out', clearProps: 'opacity,filter,transform' });
   }, []);
+  useLayoutEffect(() => {
+    if (!bar.current) return;
+    gsap.to(bar.current, { xPercent: open ? 0 : 105, autoAlpha: open ? 1 : 0, duration: 0.5, ease: 'power3.inOut' });
+    if (open) bar.current.querySelector<HTMLElement>('.item-head')?.focus();
+  }, [open]);
+  useEffect(() => {
+    const toggle = () => setOpen((o) => !o);
+    window.addEventListener('fte-menu', toggle);
+    return () => window.removeEventListener('fte-menu', toggle);
+  }, []);
+
+  const body: Record<(typeof ITEMS)[number], ReactNode> = {
+    Listen: <Listen />, Layers: <Layers />, Time: <Time />, Window: <WindowControls />, Settings: <Settings />, 'About the data': <About />,
+  };
   return (
     <div className="hud" ref={hud}>
       <Brand />
-      <Toolbar onSettings={() => setSettingsOpen(!settings)} />
-      <div className="sheet">
-        <Navigate />
-        <div className="side">
-          <Layers />
-          <Hearing />
-        </div>
-        <TimeBar />
-      </div>
-      <SettingsDrawer open={settings} onClose={() => setSettingsOpen(false)} />
+      <button type="button" className="menu-button glass" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(!open)}>
+        {open ? 'Close' : 'Menu'} <kbd>M</kbd>
+      </button>
+      <aside id="sidebar" ref={bar} className="sidebar glass" aria-label="Menu" style={{ visibility: 'hidden' }}>
+        {ITEMS.map((t) => (
+          <Item key={t} title={t} open={item === t} onToggle={() => setItem(item === t ? null : t)}>{body[t]}</Item>
+        ))}
+      </aside>
     </div>
   );
 }

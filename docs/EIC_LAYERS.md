@@ -1,19 +1,25 @@
 # EIC layers
 
-Stage 1 ships only DEMO DATA (`src/data/fixture.ts`). Stage 2 replaces `source` in `src/data/index.ts`
-with a real `DataSource`; nothing else changes.
+Stage 2 data. Built by `pipeline/build_eic.py` from NASA Scientific Visualization Studio (SVS) pages made for the
+Earth Information Center, served from `public/data/eic/` (about 9 MB, works offline). `src/data/eic.ts` reads them.
+If the manifest cannot load, the app falls back to labelled DEMO DATA (`src/data/fixture.ts`).
 
-| Key | Layer id | Demo unit and range | Stage 2 candidate (to confirm against the EIC catalogue) |
-|---|---|---|---|
-| 1 | temperature | °C, -50 to 45 | Surface air temperature (e.g. MERRA-2 T2M) |
-| 2 | wind | m/s, 0 to 30 | 10 m wind speed (e.g. MERRA-2 U10M/V10M) |
-| 3 | precipitation | mm/day, 0.1 to 60, log | IMERG daily precipitation |
-| 4 | co2 | ppm, 395 to 435 | OCO-2 XCO2 |
-| 5 | co | ppb, 40 to 300 | MOPITT or TROPOMI CO |
-| 6 | no2 | µmol/m², 1 to 300, log | OMI or TROPOMI tropospheric NO2 |
-| 7 | o3 | DU, 120 to 480 | OMI total column ozone |
-| 8 | pm25 | µg/m³, 1 to 200, log | MERRA-2 surface PM2.5 |
+The SVS pages publish movies and frames, not data files, so values are recovered from pixels and are as good as
+the visualisation: colour-bar inversion for sea temperature, "index" units elsewhere.
 
-The products above are placeholders for planning. None of them has been fetched or verified in Stage 1.
-Each real source must fill `LayerInfo` (`id, name, unit, min, max, scale, timeRange, resolutionDeg, cadence, sourceText`)
-and set `demo: false`.
+| Key | Layer | Source | Time | Grid | Value | Method |
+|---|---|---|---|---|---|---|
+| 1 | Sea surface temperature | [SVS 3912](https://svs.gsfc.nasa.gov/3912/), ECCO2 model, `ecco2_sst_flow.m4v` (640 x 320) + `flat_ecco2_dates.txt` | daily, 2007-03-25 .. 2008-03-03 (345 days) | 1° | 0 .. 32 °C | Streak colours matched to the nearest hue on `sst_ecco2_cbar.png`; all frames of a day averaged; gaps filled from the ±3-day mean, then neighbours up to 3°, ocean only |
+| 2 | Lightning | [SVS 5011](https://svs.gsfc.nasa.gov/5011/), ISS LIS, SOS movie `iss_lightning_sos_yearly_07312023_2048p60.mp4` + `labels.txt` | one frame per 10 days, 2017-03-01 .. 2023-07-30 (234) | 1° | index 0 .. 0.4 | Share of each cell covered by yellow lightning dots (10-day roving window in the source) |
+| 3 | Night lights | [SVS 5313](https://svs.gsfc.nasa.gov/5313/), Black Marble, EIC movie (7680 x 2160) | annual, 2012 .. 2023 (12) | 0.5° | index 0 .. 0.6 | Brightness above the basemap (basemap land < 35/255, grey snow excluded) |
+| 4 | Night light change 2012 → 2023 | same movie, change sequence | one map | 0.5° | index −0.6 .. +0.6 | Purple (new lights) minus orange (lights out), where lit |
+
+Geo-registration: every source is fitted against Natural Earth land (longitude of the left edge, latitude of
+top and bottom) and reports the agreement: SST 0.95, night lights 0.90, lightning full globe by the SOS format.
+
+Known issues in the sources:
+- `labels.txt` for the lightning movie says 2003 after 2022-12-31; the movie ends 2023-07-31, so those labels are read as 2023.
+- The night-lights EIC frame shows two copies of the world side by side; the left copy is used. Year frames were
+  picked from the on-screen year labels (frame 5 + 17.5 per year).
+- Records do not overlap in time for sea temperature (2007-08) and the other layers (2012-23). Turning a layer
+  on moves the date into its record and says so.

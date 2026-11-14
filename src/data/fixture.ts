@@ -1,22 +1,17 @@
 import { computeStats } from './stats';
 import type { BBox, DataSource, LayerId, LayerInfo, WindowData } from './types';
 
-// DEMO DATA. Plausible-looking synthetic fields, deterministic for (layer, date).
-// Nothing here is NASA data; every layer is flagged demo and labelled as such in UI and speech.
+// DEMO DATA. Synthetic stand-ins for the four EIC layers, deterministic for (layer, date). Used by tests
+// and as an offline fallback if the EIC manifest cannot load. Flagged demo and labelled as such.
 
 const DEMO = 'DEMO DATA: synthetic fixture for development, not NASA data.';
-const RANGE: [string, string] = ['2015-01-01', '2026-12-31'];
 
 const LAYERS: LayerInfo[] = [
-  { id: 'temperature', name: 'Surface air temperature', unit: '°C', unitSpoken: 'degrees Celsius', min: -50, max: 45, scale: 'linear' },
-  { id: 'wind', name: 'Wind speed', unit: 'm/s', unitSpoken: 'metres per second', min: 0, max: 30, scale: 'linear' },
-  { id: 'precipitation', name: 'Precipitation', unit: 'mm/day', unitSpoken: 'millimetres per day', min: 0.1, max: 60, scale: 'log' },
-  { id: 'co2', name: 'Carbon dioxide', unit: 'ppm', unitSpoken: 'parts per million', min: 395, max: 435, scale: 'linear' },
-  { id: 'co', name: 'Carbon monoxide', unit: 'ppb', unitSpoken: 'parts per billion', min: 40, max: 300, scale: 'linear' },
-  { id: 'no2', name: 'Nitrogen dioxide', unit: 'µmol/m²', unitSpoken: 'micromoles per square metre', min: 1, max: 300, scale: 'log' },
-  { id: 'o3', name: 'Ozone column', unit: 'DU', unitSpoken: 'Dobson units', min: 120, max: 480, scale: 'linear' },
-  { id: 'pm25', name: 'Fine particulate matter, PM2.5', unit: 'µg/m³', unitSpoken: 'micrograms per cubic metre', min: 1, max: 200, scale: 'log' },
-].map((l) => ({ ...l, id: l.id as LayerId, scale: l.scale as 'linear' | 'log', timeRange: RANGE, resolutionDeg: 0.5, cadence: 'daily' as const, sourceText: DEMO, demo: true }));
+  { id: 'sst', name: 'Sea surface temperature', unit: '°C', unitSpoken: 'degrees Celsius', min: 0, max: 32, scale: 'linear', cadence: 'daily' },
+  { id: 'lightning', name: 'Lightning', unit: 'index', unitSpoken: 'on a lightning density index from 0 to 1', min: 0, max: 0.4, scale: 'linear', cadence: '10-day' },
+  { id: 'lights', name: 'Night lights', unit: 'index', unitSpoken: 'on a brightness index from 0 to 1', min: 0, max: 0.6, scale: 'linear', cadence: 'annual' },
+  { id: 'lightschange', name: 'Night light change 2012 to 2023', unit: 'index', unitSpoken: 'on a scale from minus 1 to plus 1', min: -0.6, max: 0.6, scale: 'linear', cadence: 'static' },
+].map((l) => ({ ...l, id: l.id as LayerId, scale: 'linear' as const, cadence: l.cadence as LayerInfo['cadence'], timeRange: ['2007-01-01', '2023-12-31'] as [string, string], resolutionDeg: 0.5, sourceText: DEMO, demo: true }));
 
 const D2R = Math.PI / 180;
 
@@ -67,46 +62,20 @@ export function fieldValue(id: LayerId, lat: number, lon: number, d: DayInfo): n
   if (blob(lat, lon, -42, -125, 6) > 0.3) return NaN; // simulated sensor gap, all layers
 
   switch (id) {
-    case 'temperature': {
-      const base = 30 * Math.cos(lat * D2R) ** 1.5 - 18;
-      return base - 14 * Math.sin(lat * D2R) * season + (drift(1, 12) - 0.5) * 10;
+    case 'sst': {
+      const base = 29 * Math.cos(lat * D2R) ** 2 - 1;
+      return Math.max(-1.8, base - 4 * Math.sin(lat * D2R) * season + (drift(1, 12) - 0.5) * 3);
     }
-    case 'wind': {
-      const jets = 14 * (blob(lat, 0, 45, 0, 8) + blob(lat, 0, -50, 0, 8));
-      const trades = 6 * (blob(lat, 0, 15, 0, 6) + blob(lat, 0, -15, 0, 6));
-      return Math.max(0, 2 + jets + trades + (drift(2, 10) - 0.5) * 12);
+    case 'lightning': {
+      const storms = blob(lat, lon, -2, 24, 10) + blob(lat, lon, -5, -60, 12) + blob(lat, lon, 5, 110, 12);
+      return Math.max(0, 0.3 * storms * drift(2, 8) + 0.03 * blob(lat, 0, 0, 0, 25));
     }
-    case 'precipitation': {
-      const itcz = blob(lat, 0, 6 - 8 * season, 0, 7);
-      const storms = Math.max(0, drift(3, 8) - 0.45) * 2;
-      return Math.max(0.1, 40 * itcz * drift(4, 6) + 25 * storms * (1 - Math.abs(lat) / 90));
+    case 'lights': {
+      const cities = blob(lat, lon, 40, -75, 3) + blob(lat, lon, 51, 5, 4) + blob(lat, lon, 28, 77, 3) + blob(lat, lon, 31, 121, 3);
+      return Math.min(0.6, 0.5 * cities * (0.9 + 0.01 * (d.year - 2012)));
     }
-    case 'co2': {
-      const years = d.year - 2015 + d.doy / 365;
-      const cycle = Math.cos((2 * Math.PI * (d.doy - 130)) / 365) * (lat > 0 ? 3.5 : 0.8);
-      return 400 + 2.4 * years + cycle + (noise(lat, lon, 20, 5) - 0.5) * 3;
-    }
-    case 'co': {
-      if (Math.abs(lat) > 70) return NaN; // retrieval gap at high latitude
-      const fires = blob(lat, lon, -8, 20, 8) + blob(lat, lon, -8, -60, 8) + blob(lat, lon, 2, 105, 6);
-      return 60 + 40 * (lat > 0 ? 1 : 0.3) + 150 * fires * drift(6, 10) + 30 * drift(7, 15);
-    }
-    case 'no2': {
-      if (Math.abs(lat) > 70) return NaN;
-      const cities = blob(lat, lon, 35, 115, 5) + blob(lat, lon, 28, 77, 4) + blob(lat, lon, 51, 7, 4) + blob(lat, lon, 40, -76, 4);
-      return Math.max(1, 6 + 250 * cities * (0.6 + 0.4 * drift(8, 6)) + 8 * drift(9, 10));
-    }
-    case 'o3': {
-      const polarNight = (lat < -75 && d.doy > 150 && d.doy < 240) || (lat > 75 && (d.doy < 45 || d.doy > 330));
-      if (polarNight) return NaN;
-      const hole = lat < -60 && d.doy > 245 && d.doy < 320 ? 140 * Math.sin((Math.PI * (d.doy - 245)) / 75) : 0;
-      return 260 + 120 * Math.abs(Math.sin(lat * D2R)) ** 2 - hole + 40 * (drift(10, 15) - 0.5);
-    }
-    case 'pm25': {
-      if (Math.abs(lat) > 70) return NaN;
-      const sources = 120 * blob(lat, lon, 27, 80, 5) + 90 * blob(lat, lon, 33, 113, 6) + 70 * blob(lat, lon, 20, 8, 10);
-      return Math.max(1, 4 + sources * (0.5 + drift(11, 8)) + 6 * drift(12, 10));
-    }
+    case 'lightschange':
+      return 0.4 * blob(lat, lon, 28, 77, 5) - 0.3 * blob(lat, lon, 49, 2, 4);
   }
 }
 

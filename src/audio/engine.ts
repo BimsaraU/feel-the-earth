@@ -13,9 +13,8 @@ type Buffers = Record<string, Tone.ToneAudioBuffer>;
 
 // Sustained samples get a slower attack and release than struck ones.
 const ENVELOPE: Record<Instrument, { attack: number; release: number }> = {
-  cello: { attack: 0.06, release: 0.5 }, contrabass: { attack: 0.08, release: 0.6 }, clarinet: { attack: 0.04, release: 0.4 },
-  oboe: { attack: 0.04, release: 0.4 }, flute: { attack: 0.01, release: 0.25 }, harp: { attack: 0, release: 1.2 },
-  glock: { attack: 0, release: 1.5 }, marimba: { attack: 0, release: 0.8 }, piano: { attack: 0, release: 0.8 },
+  cello: { attack: 0.06, release: 0.5 }, clarinet: { attack: 0.04, release: 0.4 }, harp: { attack: 0, release: 1.2 },
+  glock: { attack: 0, release: 1.5 }, piano: { attack: 0, release: 0.8 },
   cellotrem: { attack: 0.4, release: 1.2 },
 };
 
@@ -164,6 +163,8 @@ class AudioEngine {
   severity = 0;
   mood: Mood = 0;
   onAccent: (() => void) | null = null;
+  /** Called on every bar line, in step with the audio (time travel). */
+  onBar: (() => void) | null = null;
   firstLayer: LayerId | null = null;
 
   private shots: Buffers = {};
@@ -294,8 +295,9 @@ class AudioEngine {
         this.play('timpani', { at: time + 0.3 * stepSec, db: db - 5, rate: 0.94, lowpass: 900, music: true });
       }
     }
+    if (i % 4 === 0 && this.onBar) { const cb = this.onBar; Tone.getDraw().schedule(cb, time); }
     // No layer on: a quiet felt-piano pulse on each bar so the app is never silent.
-    if (!enabled && i % 4 === 0) this.voices.get('temperature')?.preview({ notes: [], noData: true, accent: false, value: NaN }, time, stepSec);
+    if (!enabled && i % 4 === 0) this.voices.get(VOICES[0].layer)?.preview({ notes: [], noData: true, accent: false, value: NaN }, time, stepSec);
   }
 
   get playing() {
@@ -368,7 +370,6 @@ class AudioEngine {
   }
 
   setMasterVolume(v: number) { this.volume?.gain.rampTo(v, 0.1); }
-  setTempo(bpm: number) { Tone.getTransport().bpm.rampTo(bpm, 0.5); }
 
   setMono(on: boolean) {
     this.volume.disconnect();

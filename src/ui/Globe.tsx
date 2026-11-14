@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
 import { engine } from '../audio/engine';
 import { norm } from '../audio/mapping';
-import { dragEnd, dragStart, setCenter, setSize, sizeDone } from '../controller';
+import { dragEnd, dragStart, isGliding, setCenter, setSize, sizeDone } from '../controller';
 import { source } from '../data';
 import type { LayerId } from '../data/types';
 import { useApp } from '../state';
@@ -150,6 +150,7 @@ export function Globe() {
     let offset = { lat: 0, lon: 0 };
     let start = { lat: 0, lon: 0 };
     let last = { x: 0, y: 0, d: 0 };
+    let spin = false; // two-finger touch: the globe turns under the fingers, the window stays at the touch point
 
     // Per frame: move the scan line and keep the window in view with a gentle camera chase.
     let raf = 0;
@@ -158,7 +159,8 @@ export function Globe() {
       const west = st.lon - st.size / 2;
       (map.getSource('scan') as GeoJSONSource | undefined)?.setData(
         line(west + st.size * engine.loopPhase(), Math.max(-MAX_MERC, st.lat - st.size / 2), Math.min(MAX_MERC, st.lat + st.size / 2)));
-      if (mode === 'none' && !st.globeMode && !resizing) {
+      // Only a keyboard or button glide moves the camera. Touch never moves the globe with one finger.
+      if (mode === 'none' && isGliding() && !st.globeMode && !resizing) {
         const p = map.project([st.lon, st.lat]);
         const w = c.clientWidth, h = c.clientHeight;
         if (Number.isNaN(p.x) || p.x < w * 0.3 || p.x > w * 0.7 || p.y < h * 0.3 || p.y > h * 0.7) {
@@ -205,8 +207,9 @@ export function Globe() {
         grace = window.setTimeout(() => { if (pts.size === 1 && mode === 'pending') beginWindow([...pts.values()][0], true); }, 80);
       } else {
         clearTimeout(grace);
-        if (mode === 'window') { setCenter(start.lat, start.lon, true); dragEnd(); } // second finger cancels the window drag
+        if (mode !== 'window') dragStart();
         mode = 'globe';
+        spin = true;
         last = measure();
       }
     };
@@ -222,6 +225,10 @@ export function Globe() {
         rotate(m.x - last.x, m.y - last.y);
         if (m.d && last.d) map.setZoom(Math.max(0.8, Math.min(8, map.getZoom() + Math.log2(m.d / last.d))));
         last = m;
+        if (spin) {
+          const ll = map.unproject([m.x, m.y]);
+          setCenter(ll.lat, ll.lng, false);
+        }
       }
     };
     const up = (e: PointerEvent) => {
@@ -233,7 +240,8 @@ export function Globe() {
         setCenter(ll.lat, ll.lng, true); // a quick tap places the window
       }
       if (pts.size === 0) {
-        if (mode === 'window') dragEnd();
+        if (mode === 'window' || spin) dragEnd();
+        spin = false;
         mode = 'none';
       } else if (mode === 'globe') last = measure();
     };
@@ -270,7 +278,7 @@ export function Globe() {
       role="application"
       tabIndex={0}
       aria-roledescription="globe"
-      aria-label="Globe with listening window. Arrow keys glide the window, plus and minus resize it, W says where you are, H says what you hear. Drag with one finger to move the window under your fingertip, two fingers to turn and zoom."
+      aria-label="Globe with listening window. Arrow keys glide the window, plus and minus resize it, W says where you are, H says what you hear, M opens the menu. One finger moves the window under your fingertip; two fingers spin and zoom the globe while the window stays under your fingers."
     />
   );
 }

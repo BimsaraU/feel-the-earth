@@ -21,13 +21,9 @@ SR = 44100
 # Pitched instruments: regex over the VSCO-2-CE file tree, first group = note name.
 INSTRUMENTS = {
     "cello":      (r"Strings/Cello Section/susvib/susvib_([A-G]#?\d)_v3_1\.wav", "C2", "F4", 3.5),
-    "flute":      (r"Woodwinds/Flute/stac/LDFlute_stac_([A-G]#?\d)_v3_rr1\.wav", "C4", "C7", 1.0),
     "harp":       (r"Strings/Harp/KSHarp_([A-G]#?\d)_(?:mf|f|mp)\.wav", "C3", "G6", 2.5),
-    "contrabass": (r"Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_([A-G]#?\d)_v3_rr1\.wav", "C1", "B2", 4.0),
     "clarinet":   (r"Woodwinds/Clarinet/susLong/DCClar_susLong_([A-G]#?\d)_v3_rr1_sum\.wav", "D2", "F#5", 3.0),
-    "oboe":       (r"Woodwinds/Oboe/Sus/Oboe_Sus_([A-G]#?\d)_v\d_Main\.wav", "A#2", "F5", 3.0),
     "glock":      (r"Percussion/Glock/glock_medium_([A-G]#?\d)\.wav", "G4", "G6", 2.0),
-    "marimba":    (r"Percussion/Marimba/Marimba_hit_Outrigger_([A-G]#?\d)_loud_01\.wav", "F1", "C6", 1.5),
     "piano":      (r"Keys/Upright Nr1/UR1_([A-G]#?\d)_pp_RR1\.wav", "C2", "C6", 3.0),
     # Severity voice: tremolo strings for the darkening drone.
     "cellotrem":  (r"Strings/Cello Section/trem/trem_([A-G]#?\d)_v\d_1\.wav", "C1", "F4", 3.5),

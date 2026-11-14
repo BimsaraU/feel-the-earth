@@ -3,7 +3,7 @@
 
 import type { LayerId, LayerInfo } from '../data/types';
 
-export type Instrument = 'cello' | 'flute' | 'harp' | 'contrabass' | 'clarinet' | 'oboe' | 'glock' | 'marimba' | 'piano' | 'cellotrem';
+export type Instrument = 'cello' | 'harp' | 'clarinet' | 'glock' | 'piano' | 'cellotrem';
 
 /**
  * Orchestral role. All roles draw notes from the one shared chord of the bar (see harmony.ts),
@@ -44,32 +44,19 @@ export interface VoiceMapping {
 }
 
 export const VOICES: VoiceMapping[] = [
-  { layer: 'temperature', key: 1, instrument: 'cello', instrumentSpoken: 'the cello section', role: 'melody', register: [45, 69],
-    timbre: { hp: [220, 60], lp: [9000, 2400], q: [0.7, 0.7] }, danger: { from: 0.72, to: 0.95, what: 'heat' },
-    pan: -0.25, trimDb: 0, hear: 'Louder means warmer air; cold air sounds thin and icy, hot air dark and full.' },
-  { layer: 'wind', key: 2, instrument: 'flute', instrumentSpoken: 'the flute and the wind', role: 'arp', register: [74, 91],
-    timbre: { hp: [500, 300], lp: [4000, 10000], q: [0.7, 0.7] }, texture: { sample: 'windbed', db: [-40, -16] },
-    danger: { from: 0.6, to: 0.9, what: 'storm winds' },
-    pan: 0.45, trimDb: -6, hear: 'More and louder flute notes, and more wind noise, mean stronger wind.' },
-  { layer: 'precipitation', key: 3, instrument: 'harp', instrumentSpoken: 'the harp and the rain', role: 'arp', register: [62, 86],
-    timbre: { hp: [200, 200], lp: [5000, 8000], q: [0.7, 0.7] }, texture: { sample: 'rain', db: [-42, -14] },
-    danger: { from: 0.7, to: 0.95, what: 'flooding rain' },
-    pan: -0.55, trimDb: -4, hear: 'More harp plucks and louder rain mean heavier rain.' },
-  { layer: 'co2', key: 4, instrument: 'contrabass', instrumentSpoken: 'the double bass', role: 'bass', register: [28, 43],
-    timbre: { hp: [35, 35], lp: [1600, 450], q: [0.7, 5] }, danger: { from: 0.35, to: 0.9, what: 'carbon dioxide' },
-    pan: 0, trimDb: 0, hear: 'Louder, darker and more growling means more carbon dioxide.' },
-  { layer: 'co', key: 5, instrument: 'clarinet', instrumentSpoken: 'the clarinet', role: 'pad', register: [50, 67],
-    timbre: { hp: [150, 150], lp: [4000, 1600], q: [0.7, 3] }, danger: { from: 0.45, to: 0.9, what: 'carbon monoxide' },
-    pan: 0.2, trimDb: -4, hear: 'Louder and duller means more carbon monoxide.' },
-  { layer: 'no2', key: 6, instrument: 'oboe', instrumentSpoken: 'the oboe', role: 'pad', register: [62, 77],
-    timbre: { hp: [300, 300], lp: [7000, 3200], q: [0.7, 7] }, danger: { from: 0.4, to: 0.85, what: 'nitrogen dioxide' },
-    pan: -0.15, trimDb: -6, hear: 'Louder and harsher, more nasal, means more nitrogen dioxide.' },
-  { layer: 'o3', key: 7, instrument: 'glock', instrumentSpoken: 'the glockenspiel', role: 'color', register: [79, 98],
-    timbre: { hp: [1200, 1200], lp: [6000, 12000], q: [0.7, 0.7] }, danger: { from: 0.35, to: 0.05, what: 'ozone loss' },
-    pan: 0.6, trimDb: -9, hear: 'More and brighter bells mean a thicker ozone layer; an ozone hole falls silent.' },
-  { layer: 'pm25', key: 8, instrument: 'marimba', instrumentSpoken: 'the marimba', role: 'pulse', register: [45, 60],
-    timbre: { hp: [80, 80], lp: [5000, 700], q: [0.7, 1.5] }, danger: { from: 0.45, to: 0.85, what: 'smoky, dusty air' },
-    pan: 0.3, trimDb: -4, hear: 'Louder and more muffled, as if through smog, means dirtier air.' },
+  { layer: 'sst', key: 1, instrument: 'cello', instrumentSpoken: 'the cello section', role: 'melody', register: [45, 69],
+    timbre: { hp: [240, 60], lp: [9000, 2400], q: [0.7, 0.7] }, danger: { from: 0.86, to: 0.97, what: 'marine heat' },
+    pan: -0.2, trimDb: 0, hear: 'Louder means warmer water; cold water sounds thin and icy, warm water dark and full.' },
+  { layer: 'lightning', key: 2, instrument: 'glock', instrumentSpoken: 'the glockenspiel and the rain', role: 'color', register: [79, 98],
+    timbre: { hp: [900, 900], lp: [7000, 12000], q: [0.7, 0.7] }, texture: { sample: 'rain', db: [-44, -16] },
+    danger: { from: 0.3, to: 0.75, what: 'thunderstorms' },
+    pan: 0.5, trimDb: -8, hear: 'Each bright strike is a lightning hot spot; more strikes and louder rain mean more lightning.' },
+  { layer: 'lights', key: 3, instrument: 'harp', instrumentSpoken: 'the harp', role: 'arp', register: [62, 86],
+    timbre: { hp: [200, 200], lp: [3500, 9000], q: [0.7, 0.7] }, danger: { from: 2, to: 3, what: 'none' },
+    pan: -0.5, trimDb: -4, hear: 'More and brighter harp notes mean more night light from towns and cities.' },
+  { layer: 'lightschange', key: 4, instrument: 'clarinet', instrumentSpoken: 'the clarinet', role: 'pad', register: [50, 67],
+    timbre: { hp: [150, 150], lp: [1200, 5000], q: [0.7, 0.7] }, danger: { from: 2, to: 3, what: 'none' },
+    pan: 0.2, trimDb: -4, hear: 'Bright and loud means new lights since 2012; dark and quiet means lights went out.' },
 ];
 
 export const voiceFor = (layer: LayerId) => VOICES.find((v) => v.layer === layer)!;
@@ -125,6 +112,7 @@ export const HAPTICS = {
   timeStep: [8],
   accent: [10],
   test: [40, 60, 40],
+  tick: [6],
 };
 export type HapticPattern = keyof typeof HAPTICS;
 

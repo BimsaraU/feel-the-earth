@@ -12,7 +12,10 @@ by `scripts/prepare_audio.py`. Geodata is rasterised by `scripts/build_geo.py`.
 | `public/data/geo/grid.bin` (sea names) | Natural Earth 1:50m Marine Areas, [ne_50m_geography_marine_polys.geojson](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_geography_marine_polys.geojson) | Public domain |
 | `public/tiles/**` | NASA Earth Observatory (Reto Stöckli, NASA GSFC), Blue Marble "Whole world - land and oceans", [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Whole_world_-_land_and_oceans.jpg) | Public domain (NASA) |
 | `public/data/geo/elevation.bin` | NOAA NCEI ETOPO5 5-minute global relief, https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO5/ | Public domain (US Government) |
-| Layer values (all 8 layers) | **DEMO DATA**, generated in `src/data/fixture.ts`. Not NASA data. | Project code |
+| `public/data/eic/sst_*.png` | NASA SVS 3912 "Global Sea Surface Currents and Temperature" (Greg Shirah), ECCO2 model, https://svs.gsfc.nasa.gov/3912/ | NASA media, public domain; credit NASA/Goddard Space Flight Center Scientific Visualization Studio |
+| `public/data/eic/lightning_*.png` | NASA SVS 5011 "Lightning Events Detected from the ISS 2017-2023" (Michala Garrison), https://svs.gsfc.nasa.gov/5011/ | NASA media, public domain; credit NASA SVS |
+| `public/data/eic/lights_*.png`, `lightschange_*.png` | NASA SVS 5313 "Change in Night Lights between 2012 and 2023 - EIC Version" (Kel Elkins), https://svs.gsfc.nasa.gov/5313/ | NASA media, public domain; credit NASA SVS |
+| Fixture values (tests, offline fallback only) | **DEMO DATA**, generated in `src/data/fixture.ts`. Not NASA data. | Project code |
 
 ## Software
 
@@ -47,12 +50,6 @@ recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a deri
 | `public/audio/cello/F2.mp3` | [VSCO-2-CE Strings/Cello Section/susvib/susvib_F2_v3_1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello%20Section/susvib/susvib_F2_v3_1.wav) | CC0 1.0 |
 | `public/audio/cello/F4.mp3` | [VSCO-2-CE Strings/Cello Section/susvib/susvib_F4_v3_1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello%20Section/susvib/susvib_F4_v3_1.wav) | CC0 1.0 |
 | `public/audio/cello/G3.mp3` | [VSCO-2-CE Strings/Cello Section/susvib/susvib_G3_v3_1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello%20Section/susvib/susvib_G3_v3_1.wav) | CC0 1.0 |
-| `public/audio/flute/A4.mp3` | [VSCO-2-CE Woodwinds/Flute/stac/LDFlute_stac_A4_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_A4_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/flute/A5.mp3` | [VSCO-2-CE Woodwinds/Flute/stac/LDFlute_stac_A5_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_A5_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/flute/C4.mp3` | [VSCO-2-CE Woodwinds/Flute/stac/LDFlute_stac_C4_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_C4_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/flute/C5.mp3` | [VSCO-2-CE Woodwinds/Flute/stac/LDFlute_stac_C5_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_C5_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/flute/E4.mp3` | [VSCO-2-CE Woodwinds/Flute/stac/LDFlute_stac_E4_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_E4_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/flute/E5.mp3` | [VSCO-2-CE Woodwinds/Flute/stac/LDFlute_stac_E5_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_E5_v3_rr1.wav) | CC0 1.0 |
 | `public/audio/harp/A4.mp3` | [VSCO-2-CE Strings/Harp/KSHarp_A4_mf.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Harp/KSHarp_A4_mf.wav) | CC0 1.0 |
 | `public/audio/harp/B3.mp3` | [VSCO-2-CE Strings/Harp/KSHarp_B3_mf.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Harp/KSHarp_B3_mf.wav) | CC0 1.0 |
 | `public/audio/harp/B5.mp3` | [VSCO-2-CE Strings/Harp/KSHarp_B5_mf.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Harp/KSHarp_B5_mf.wav) | CC0 1.0 |
@@ -66,16 +63,6 @@ recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a deri
 | `public/audio/harp/F6.mp3` | [VSCO-2-CE Strings/Harp/KSHarp_F6_mf.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Harp/KSHarp_F6_mf.wav) | CC0 1.0 |
 | `public/audio/harp/G3.mp3` | [VSCO-2-CE Strings/Harp/KSHarp_G3_mf.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Harp/KSHarp_G3_mf.wav) | CC0 1.0 |
 | `public/audio/harp/G5.mp3` | [VSCO-2-CE Strings/Harp/KSHarp_G5_mf.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Harp/KSHarp_G5_mf.wav) | CC0 1.0 |
-| `public/audio/contrabass/A1.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_A1_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_A1_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/B2.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_B2_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_B2_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/Cs2.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_C#2_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_C#2_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/C1.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_C1_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_C1_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/D1.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_D1_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_D1_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/E1.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_E1_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_E1_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/E2.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_E2_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_E2_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/Fs1.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_F#1_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_F#1_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/Gs1.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_G#1_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_G#1_v3_rr1.wav) | CC0 1.0 |
-| `public/audio/contrabass/Gs2.mp3` | [VSCO-2-CE Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_G#2_v3_rr1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo%20Contrabass/SusNV/BKCtbss_SusNV_G#2_v3_rr1.wav) | CC0 1.0 |
 | `public/audio/clarinet/As2.mp3` | [VSCO-2-CE Woodwinds/Clarinet/susLong/DCClar_susLong_A#2_v3_rr1_sum.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Clarinet/susLong/DCClar_susLong_A#2_v3_rr1_sum.wav) | CC0 1.0 |
 | `public/audio/clarinet/As3.mp3` | [VSCO-2-CE Woodwinds/Clarinet/susLong/DCClar_susLong_A#3_v3_rr1_sum.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Clarinet/susLong/DCClar_susLong_A#3_v3_rr1_sum.wav) | CC0 1.0 |
 | `public/audio/clarinet/As4.mp3` | [VSCO-2-CE Woodwinds/Clarinet/susLong/DCClar_susLong_A#4_v3_rr1_sum.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Clarinet/susLong/DCClar_susLong_A#4_v3_rr1_sum.wav) | CC0 1.0 |
@@ -87,30 +74,11 @@ recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a deri
 | `public/audio/clarinet/F2.mp3` | [VSCO-2-CE Woodwinds/Clarinet/susLong/DCClar_susLong_F2_v3_rr1_sum.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Clarinet/susLong/DCClar_susLong_F2_v3_rr1_sum.wav) | CC0 1.0 |
 | `public/audio/clarinet/F3.mp3` | [VSCO-2-CE Woodwinds/Clarinet/susLong/DCClar_susLong_F3_v3_rr1_sum.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Clarinet/susLong/DCClar_susLong_F3_v3_rr1_sum.wav) | CC0 1.0 |
 | `public/audio/clarinet/F4.mp3` | [VSCO-2-CE Woodwinds/Clarinet/susLong/DCClar_susLong_F4_v3_rr1_sum.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Clarinet/susLong/DCClar_susLong_F4_v3_rr1_sum.wav) | CC0 1.0 |
-| `public/audio/oboe/As2.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_A#2_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_A#2_v1_Main.wav) | CC0 1.0 |
-| `public/audio/oboe/As3.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_A#3_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_A#3_v1_Main.wav) | CC0 1.0 |
-| `public/audio/oboe/As4.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_A#4_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_A#4_v1_Main.wav) | CC0 1.0 |
-| `public/audio/oboe/D3.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_D3_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_D3_v1_Main.wav) | CC0 1.0 |
-| `public/audio/oboe/D4.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_D4_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_D4_v1_Main.wav) | CC0 1.0 |
-| `public/audio/oboe/D5.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_D5_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_D5_v1_Main.wav) | CC0 1.0 |
-| `public/audio/oboe/F3.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_F3_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_F3_v1_Main.wav) | CC0 1.0 |
-| `public/audio/oboe/F4.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_F4_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_F4_v1_Main.wav) | CC0 1.0 |
-| `public/audio/oboe/F5.mp3` | [VSCO-2-CE Woodwinds/Oboe/Sus/Oboe_Sus_F5_v1_Main.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_F5_v1_Main.wav) | CC0 1.0 |
 | `public/audio/glock/C5.mp3` | [VSCO-2-CE Percussion/Glock/glock_medium_C5.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Glock/glock_medium_C5.wav) | CC0 1.0 |
 | `public/audio/glock/C6.mp3` | [VSCO-2-CE Percussion/Glock/glock_medium_C6.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Glock/glock_medium_C6.wav) | CC0 1.0 |
 | `public/audio/glock/G4.mp3` | [VSCO-2-CE Percussion/Glock/glock_medium_G4.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Glock/glock_medium_G4.wav) | CC0 1.0 |
 | `public/audio/glock/G5.mp3` | [VSCO-2-CE Percussion/Glock/glock_medium_G5.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Glock/glock_medium_G5.wav) | CC0 1.0 |
 | `public/audio/glock/G6.mp3` | [VSCO-2-CE Percussion/Glock/glock_medium_G6.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Glock/glock_medium_G6.wav) | CC0 1.0 |
-| `public/audio/marimba/B2.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_B2_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_B2_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/B4.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_B4_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_B4_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/C2.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_C2_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_C2_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/C4.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_C4_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_C4_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/C6.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_C6_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_C6_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/F1.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_F1_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_F1_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/F3.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_F3_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_F3_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/F5.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_F5_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_F5_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/G2.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_G2_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_G2_loud_01.wav) | CC0 1.0 |
-| `public/audio/marimba/G4.mp3` | [VSCO-2-CE Percussion/Marimba/Marimba_hit_Outrigger_G4_loud_01.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_G4_loud_01.wav) | CC0 1.0 |
 | `public/audio/piano/C2.mp3` | [VSCO-2-CE Keys/Upright Nr1/UR1_C2_pp_RR1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Keys/Upright%20Nr1/UR1_C2_pp_RR1.wav) | CC0 1.0 |
 | `public/audio/piano/C3.mp3` | [VSCO-2-CE Keys/Upright Nr1/UR1_C3_pp_RR1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Keys/Upright%20Nr1/UR1_C3_pp_RR1.wav) | CC0 1.0 |
 | `public/audio/piano/C4.mp3` | [VSCO-2-CE Keys/Upright Nr1/UR1_C4_pp_RR1.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Keys/Upright%20Nr1/UR1_C4_pp_RR1.wav) | CC0 1.0 |

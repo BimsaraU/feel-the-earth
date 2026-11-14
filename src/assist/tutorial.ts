@@ -58,7 +58,7 @@ export async function runTutorial() {
     if (!live()) break;
     await say(label);
     if (e === 'day' || e === 'month') engine.play(e === 'month' ? 'windchime' : 'ratchet');
-    else if (e === 'nodata') engine.voices.get('temperature')?.preview({ notes: [], noData: true, accent: false, value: NaN }, engine.now(), 0.8);
+    else if (e === 'nodata') engine.voices.get(VOICES[0].layer)?.preview({ notes: [], noData: true, accent: false, value: NaN }, engine.now(), 0.8);
     else if (e.type === 'pole') engine.play('gong', { rate: 0.7, lowpass: 500, db: 2 });
     else playEvent(e);
     await wait(typeof e === 'object' && e.type === 'line' && e.line === 'equator' ? 1600 : 1000);

@@ -11,14 +11,6 @@
    "F4": "cello/F4.mp3",
    "G3": "cello/G3.mp3"
   },
-  "flute": {
-   "A4": "flute/A4.mp3",
-   "A5": "flute/A5.mp3",
-   "C4": "flute/C4.mp3",
-   "C5": "flute/C5.mp3",
-   "E4": "flute/E4.mp3",
-   "E5": "flute/E5.mp3"
-  },
   "harp": {
    "A4": "harp/A4.mp3",
    "B3": "harp/B3.mp3",
@@ -34,18 +26,6 @@
    "G3": "harp/G3.mp3",
    "G5": "harp/G5.mp3"
   },
-  "contrabass": {
-   "A1": "contrabass/A1.mp3",
-   "B2": "contrabass/B2.mp3",
-   "C#2": "contrabass/Cs2.mp3",
-   "C1": "contrabass/C1.mp3",
-   "D1": "contrabass/D1.mp3",
-   "E1": "contrabass/E1.mp3",
-   "E2": "contrabass/E2.mp3",
-   "F#1": "contrabass/Fs1.mp3",
-   "G#1": "contrabass/Gs1.mp3",
-   "G#2": "contrabass/Gs2.mp3"
-  },
   "clarinet": {
    "A#2": "clarinet/As2.mp3",
    "A#3": "clarinet/As3.mp3",
@@ -59,35 +39,12 @@
    "F3": "clarinet/F3.mp3",
    "F4": "clarinet/F4.mp3"
   },
-  "oboe": {
-   "A#2": "oboe/As2.mp3",
-   "A#3": "oboe/As3.mp3",
-   "A#4": "oboe/As4.mp3",
-   "D3": "oboe/D3.mp3",
-   "D4": "oboe/D4.mp3",
-   "D5": "oboe/D5.mp3",
-   "F3": "oboe/F3.mp3",
-   "F4": "oboe/F4.mp3",
-   "F5": "oboe/F5.mp3"
-  },
   "glock": {
    "C5": "glock/C5.mp3",
    "C6": "glock/C6.mp3",
    "G4": "glock/G4.mp3",
    "G5": "glock/G5.mp3",
    "G6": "glock/G6.mp3"
-  },
-  "marimba": {
-   "B2": "marimba/B2.mp3",
-   "B4": "marimba/B4.mp3",
-   "C2": "marimba/C2.mp3",
-   "C4": "marimba/C4.mp3",
-   "C6": "marimba/C6.mp3",
-   "F1": "marimba/F1.mp3",
-   "F3": "marimba/F3.mp3",
-   "F5": "marimba/F5.mp3",
-   "G2": "marimba/G2.mp3",
-   "G4": "marimba/G4.mp3"
   },
   "piano": {
    "C2": "piano/C2.mp3",
@@ -182,36 +139,6 @@
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
   },
   {
-   "file": "flute/A4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_A4_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "flute/A5.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_A5_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "flute/C4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_C4_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "flute/C5.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_C5_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "flute/E4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_E4_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "flute/E5.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Flute/stac/LDFlute_stac_E5_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
    "file": "harp/A4.mp3",
    "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Harp/KSHarp_A4_mf.wav",
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
@@ -277,56 +204,6 @@
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
   },
   {
-   "file": "contrabass/A1.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_A1_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/B2.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_B2_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/Cs2.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_C#2_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/C1.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_C1_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/D1.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_D1_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/E1.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_E1_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/E2.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_E2_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/Fs1.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_F#1_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/Gs1.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_G#1_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "contrabass/Gs2.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/SusNV/BKCtbss_SusNV_G#2_v3_rr1.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
    "file": "clarinet/As2.mp3",
    "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Clarinet/susLong/DCClar_susLong_A#2_v3_rr1_sum.wav",
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
@@ -382,51 +259,6 @@
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
   },
   {
-   "file": "oboe/As2.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_A#2_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "oboe/As3.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_A#3_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "oboe/As4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_A#4_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "oboe/D3.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_D3_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "oboe/D4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_D4_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "oboe/D5.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_D5_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "oboe/F3.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_F3_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "oboe/F4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_F4_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "oboe/F5.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Woodwinds/Oboe/Sus/Oboe_Sus_F5_v1_Main.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
    "file": "glock/C5.mp3",
    "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Glock/glock_medium_C5.wav",
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
@@ -449,56 +281,6 @@
   {
    "file": "glock/G6.mp3",
    "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Glock/glock_medium_G6.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/B2.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_B2_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/B4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_B4_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/C2.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_C2_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/C4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_C4_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/C6.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_C6_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/F1.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_F1_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/F3.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_F3_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/F5.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_F5_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/G2.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_G2_loud_01.wav",
-   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
-  },
-  {
-   "file": "marimba/G4.mp3",
-   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Marimba/Marimba_hit_Outrigger_G4_loud_01.wav",
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
   },
   {

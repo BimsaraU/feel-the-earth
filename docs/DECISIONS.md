@@ -93,3 +93,23 @@ Non-obvious choices, newest last. Each entry: what, why, how to undo.
 42. **Haptics on tablets.** Root cause: Chrome on Android tablets sends a desktop user agent by default, so the old `/Android/` check fell through to the audio thump. Now any touch device with `navigator.vibrate` uses it. iPhone Safari (iOS 18+) gets system haptics through the native switch-control trick. iPads have no vibration motor and Safari has no Vibration API, so iPad web cannot vibrate; it keeps the thump. Settings has a "Test haptics" button that says which driver is in use.
 
 43. **Quieter menus.** Glass panels are more transparent and brighten on hover or focus; no visible scroll bars; Navigate starts collapsed; layer chips show short names only (state is aria-pressed and the lit outline).
+
+## 2026-11-14 Stage 2 (real EIC data, sidebar, wheels, gestures)
+
+44. **Real data from NASA SVS / EIC visualisations** (see EIC_LAYERS.md). The sources given are movies, so `pipeline/build_eic.py` recovers values from pixels and geo-registers each source against Natural Earth. The four demo layers are gone from the app; the fixture survives for tests and as a labelled DEMO fallback.
+
+45. **Sea temperature gaps are interpolated.** Flow streaks cover about 30 % of the ocean in a single day. Gaps are filled from the ±3-day mean, then from neighbours up to 3 degrees, ocean cells only (90 % coverage). This is interpolation of the visualisation, not new data.
+
+46. **Lightning and night lights are relative indices**, not physical units. Spoken as "on a lightning density index from 0 to 1" and similar, never as flashes or radiance.
+
+47. **Layer voices for the new data.** Sea temperature: cello melody (danger: marine heat above about 27.5 °C). Lightning: glockenspiel strikes plus a rain texture (danger: thunderstorms). Night lights: harp arpeggios, more notes where brighter. Light change: clarinet pad, bright and loud for new lights, dark and quiet for lights out. Unused instrument samples (flute, oboe, double bass, marimba) were removed to keep the offline download smaller.
+
+48. **Time.** The date cursor spans 2007-03-25 to 2023-12-31; outside a layer's record that layer plays the felt-piano "no data" pulse. Turning on a layer whose record does not cover the date moves the date into the record and says so. Time travel (Y, or the Time menu) advances the date one step per bar while the loop plays, using the finest cadence among active layers (day, 10 days, year), and stops at the end of the record.
+
+49. **Tempo is fixed at 72 bpm.** No single feature drives tempo, and the tempo setting was removed. Time travel uses the bar, not tempo, as its clock.
+
+50. **All menus live in one sidebar** (Menu button or M): Listen, Layers (toggles plus live readouts), Time, Window, Settings, About the data. The map shows only the place title, date and caption.
+
+51. **Sliders are tactile scroll wheels** (`src/ui/Wheel.tsx`): drag or flick with inertia, scroll, or arrow keys; each detent gives a haptic tick on phones (real haptics only: no thump sound per tick). They are ARIA sliders with spoken value text.
+
+52. **Touch: one finger never moves the globe.** The camera only follows the window during keyboard or button glides. Two fingers spin and zoom the globe, and the window stays under the fingers (its centre follows the touch centroid), so spinning sweeps the window over the Earth. This replaces the earlier "second finger cancels the window drag".
