@@ -112,7 +112,9 @@
   "singingbowl": "oneshots/singingbowl.mp3",
   "wave": "oneshots/wave.mp3",
   "whoosh": "oneshots/whoosh.mp3",
-  "windchime": "oneshots/windchime.mp3"
+  "windchime": "oneshots/windchime.mp3",
+  "oceanbed": "oneshots/oceanbed.mp3",
+  "landbed": "oneshots/landbed.mp3"
  },
  "sources": [
   {
@@ -578,6 +580,16 @@
   {
    "file": "oneshots/windchime.mp3",
    "url": "https://upload.wikimedia.org/wikipedia/commons/0/09/Windchimes.ogg",
+   "licence": "see docs/CREDITS.md"
+  },
+  {
+   "file": "oneshots/oceanbed.mp3",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/f/f1/Oceanwavescrushing.ogg",
+   "licence": "see docs/CREDITS.md"
+  },
+  {
+   "file": "oneshots/landbed.mp3",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Gentle_breeze_and_birds_singing.ogg",
    "licence": "see docs/CREDITS.md"
   }
  ]

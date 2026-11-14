@@ -44,9 +44,12 @@ ONESHOTS = {
     "wave":        ("https://upload.wikimedia.org/wikipedia/commons/f/f1/Oceanwavescrushing.ogg", 12.0, 2.5),
     "whoosh":      ("https://upload.wikimedia.org/wikipedia/commons/f/f1/Oceanwavescrushing.ogg", 40.0, 4.0),
     "windchime":   ("https://upload.wikimedia.org/wikipedia/commons/0/09/Windchimes.ogg", 0, 3.5),
+    # Ambience beds under the loop: sea, land, mixed by the land/water share of the window.
+    "oceanbed":    ("https://upload.wikimedia.org/wikipedia/commons/f/f1/Oceanwavescrushing.ogg", 60.0, 24.0),
+    "landbed":     ("https://upload.wikimedia.org/wikipedia/commons/0/0e/Gentle_breeze_and_birds_singing.ogg", 2.0, 28.0),
 }
-NO_SILENCE_TRIM = {"wave", "whoosh"}  # field-recording slices, start where asked
-LOOPED = {"whoosh"}                    # gets fades at both ends so it loops without a click
+NO_SILENCE_TRIM = {"wave", "whoosh", "oceanbed", "landbed"}  # field-recording slices, start where asked
+LOOPED = {"whoosh", "oceanbed", "landbed"}  # tail crossfaded into head so it loops seamlessly
 
 NOTE = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
 
@@ -79,11 +82,16 @@ def shape(x, start, dur, trim=True, loop=False):
         thr = 10 ** (-50 / 20) * np.max(np.abs(x))
         on = np.argmax(np.abs(x) > thr)
         x = x[max(0, on - int(0.002 * SR)):]
-    x = x[: int(dur * SR)].copy()
-    fade = int(min(0.3, dur / 4) * SR)
-    x[-fade:] *= np.linspace(1, 0, fade) ** 2
     if loop:
-        x[:fade] *= np.linspace(0, 1, fade) ** 2
+        xf = int(1.5 * SR)
+        x = x[: int(dur * SR) + xf].copy()
+        ramp = np.sin(np.linspace(0, np.pi / 2, xf)) ** 2
+        x[:xf] = x[:xf] * ramp + x[-xf:] * ramp[::-1]
+        x = x[:-xf]
+    else:
+        x = x[: int(dur * SR)].copy()
+        fade = int(min(0.3, dur / 4) * SR)
+        x[-fade:] *= np.linspace(1, 0, fade) ** 2
     return x / (np.max(np.abs(x)) + 1e-9) * 10 ** (-3 / 20)  # peak -3 dBFS
 
 
