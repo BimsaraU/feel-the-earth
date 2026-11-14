@@ -13,7 +13,7 @@ import type { LayerId } from '../data/types';
 import { haptics } from '../haptics/haptics';
 import { MAX_SIZE, MIN_SIZE, useApp } from '../state';
 import { colour, rampCss } from './colour';
-import { CONTOUR_LEVELS, zoomBy } from './Globe';
+import { zoomBy } from './Globe';
 import { Wheel } from './Wheel';
 
 const DAY = 86400000;
@@ -62,9 +62,14 @@ function Brand() {
   }, [place]);
   return (
     <header className="brand">
-      <p className="eyebrow">Feel the Earth {layers.some((l) => l.demo) && <strong className="demo">DEMO DATA, not NASA data</strong>}</p>
+      <p className="wordmark">Feel the Earth {layers.some((l) => l.demo) && <strong className="demo">Demo data, not NASA data</strong>}</p>
       <h1 ref={title}>{place}</h1>
-      <p className="coords">{coord(lat, 'N', 'S')} · {coord(lon, 'E', 'W')} · window {Math.round(size * 10) / 10}° · {spokenDate(date)}{travelling ? ' · time travel' : ''}</p>
+      <dl className="coords">
+        <div><dt>Latitude</dt><dd>{coord(lat, 'N', 'S')}</dd></div>
+        <div><dt>Longitude</dt><dd>{coord(lon, 'E', 'W')}</dd></div>
+        <div><dt>Window</dt><dd>{Math.round(size * 10) / 10}°</dd></div>
+        <div><dt>{travelling ? 'Travelling' : 'Date'}</dt><dd>{spokenDate(date)}</dd></div>
+      </dl>
       <p className="caption" role="status" aria-live="polite">{live}</p>
     </header>
   );
@@ -81,7 +86,7 @@ function TourCard() {
   return (
     <div ref={card} className="tour glass" role="region" aria-label="Listening tour">
       <div className="tour-progress" aria-hidden="true"><span style={{ width: `${((tour.i + 1) / tour.n) * 100}%` }} /></div>
-      <p className="eyebrow">Listening tour · {tour.i + 1} of {tour.n}</p>
+      <p className="label">Listening tour, stop {tour.i + 1} of {tour.n}</p>
       <h2 className="tour-title">{tour.title}</h2>
       <p className="tour-text">{tour.text}</p>
       <div className="buttons">
@@ -89,6 +94,25 @@ function TourCard() {
         <button type="button" onClick={stopTutorial}>End tour <kbd>Esc</kbd></button>
       </div>
     </div>
+  );
+}
+
+/** Play and pause as a disc; its ring fills as the scan line crosses the window, so one loop is one turn. */
+function Transport() {
+  const playing = useApp((s) => s.playing);
+  const el = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => { el.current?.style.setProperty('--phase', String(engine.loopPhase())); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <button ref={el} type="button" className="transport" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} title="Space">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        {playing ? <path d="M8 6h3v12H8zM13 6h3v12h-3z" /> : <path d="M8.5 5.5v13l10-6.5z" />}
+      </svg>
+    </button>
   );
 }
 
@@ -111,7 +135,7 @@ function Assistant() {
   const voice = useApp((s) => s.settings.voice);
   return (
     <div className="assistant glass" id="assistant" role="region" aria-label="Audio assistant">
-      <p className="eyebrow">Audio assistant</p>
+      <h2 className="panel-title">Ask about this place</h2>
       <button type="button" onClick={askWhere}>Where am I? <kbd>W</kbd></button>
       <button type="button" onClick={() => void askWhat()}>What am I hearing? <kbd>H</kbd></button>
       <button type="button" onClick={askBeacons}>Find peak and valley <kbd>B</kbd></button>
@@ -132,7 +156,7 @@ function MapKey() {
   const inRecord = shown && date >= shown.timeRange[0] && date <= shown.timeRange[1];
   return (
     <section className="mapkey glass" aria-label="Map key">
-      <p className="eyebrow">On the map</p>
+      <p className="label">Colour on the map</p>
       {shown ? (
         <>
           <p className="mapkey-name">{shown.name}</p>
@@ -142,14 +166,13 @@ function MapKey() {
             <span>{short(shown.max)} {shown.unit}</span>
           </div>
           <p className="muted small">
-            {inRecord ? `${spokenDate(date)} · ${voiceFor(shown.id).instrument}` : `No data on this date (record ${shown.timeRange[0].slice(0, 4)} to ${shown.timeRange[1].slice(0, 4)})`}
-            {' · '}contour every {short((shown.max - shown.min) / CONTOUR_LEVELS)} {shown.unit}
+            {inRecord ? `Heard as ${voiceFor(shown.id).instrument}` : `No data on this date (record ${shown.timeRange[0].slice(0, 4)} to ${shown.timeRange[1].slice(0, 4)})`}
           </p>
         </>
       ) : <p className="muted small">No data layer. Press 1 to 9 or open the menu.</p>}
       {heard.length > 0 && (
         <div className="mapkey-heard">
-          <p className="eyebrow">Heard, not drawn</p>
+          <p className="label">Also playing, not drawn</p>
           {heard.map((l) => <button key={l.id} type="button" onClick={() => showLayer(l.id)} aria-label={`Draw ${l.name} on the map`}>{l.name}</button>)}
         </div>
       )}
@@ -347,7 +370,6 @@ const ITEMS = ['Layers', 'Time', 'Window', 'Settings', 'About the data'] as cons
 export function Controls() {
   const [panel, setPanel] = useState<'menu' | 'assistant' | null>(null);
   const open = panel === 'menu';
-  const playing = useApp((s) => s.playing);
   const [item, setItem] = useState<(typeof ITEMS)[number] | null>('Layers');
   const bar = useRef<HTMLElement>(null);
   const hud = useRef<HTMLDivElement>(null);
@@ -376,12 +398,12 @@ export function Controls() {
       <Brand />
       <TourCard />
       <MapKey />
-      <nav className="bar" aria-label="Main">
-        <button type="button" className="glass" onClick={togglePlay} aria-pressed={playing}>{playing ? 'Pause' : 'Play'} <kbd>Space</kbd></button>
-        <button type="button" className="glass" aria-expanded={panel === 'assistant'} aria-controls="assistant" onClick={() => setPanel(panel === 'assistant' ? null : 'assistant')}>
+      <nav className="bar glass" aria-label="Main">
+        <Transport />
+        <button type="button" aria-expanded={panel === 'assistant'} aria-controls="assistant" onClick={() => setPanel(panel === 'assistant' ? null : 'assistant')}>
           Assistant <kbd>A</kbd>
         </button>
-        <button type="button" className="glass" aria-expanded={open} aria-controls="sidebar" onClick={() => setPanel(open ? null : 'menu')}>
+        <button type="button" aria-expanded={open} aria-controls="sidebar" onClick={() => setPanel(open ? null : 'menu')}>
           {open ? 'Close' : 'Menu'} <kbd>M</kbd>
         </button>
       </nav>

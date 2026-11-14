@@ -27,9 +27,10 @@ function StartScreen() {
     <>
       <Galaxy />
       <button ref={root} type="button" className="start" autoFocus onPointerDown={startFromGesture} onClick={startFromGesture}>
-        <span className="eyebrow">NASA Space Apps 2026 · Earth Information Jukebox</span>
         <span className="title">Feel the Earth</span>
+        <span className="lede">Turn the planet and hear its sea, sky and land as music.</span>
         <span className="pulse">{loading ? 'Loading sounds…' : START_TEXT}</span>
+        <span className="credit">Made for NASA Space Apps 2026, Earth Information Jukebox</span>
       </button>
     </>
   );

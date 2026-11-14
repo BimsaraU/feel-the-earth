@@ -8,7 +8,7 @@ import { engine } from '../audio/engine';
 import { norm } from '../audio/mapping';
 import { dragEnd, dragStart, isGliding, setCenter, setSize, sizeDone } from '../controller';
 import { source } from '../data';
-import type { BBox, LayerId, LayerInfo } from '../data/types';
+import type { BBox, LayerInfo } from '../data/types';
 import { useApp } from '../state';
 import { colour } from './colour';
 import { createFx } from './fxLayer';
@@ -48,9 +48,6 @@ const point = (lat: number, lon: number): Feature<Point> => ({ type: 'Feature', 
 
 const MERC_Y_MAX = Math.log(Math.tan(Math.PI / 4 + (MAX_MERC * Math.PI) / 360));
 
-/** Layers whose values vary smoothly get contour lines; point-like layers (lightning, lights) would only get noise. */
-const CONTOURED = new Set<LayerId>(['sst', 'airtemp', 'co2', 'precip', 'ndvi', 'aerosol']);
-export const CONTOUR_LEVELS = 16;
 /** Above this zoom a second, screen-resolution patch of the heatmap is drawn over the visible area. */
 const DETAIL_ZOOM = 2.5;
 
@@ -62,8 +59,8 @@ const cr = (f: number) => [((-f + 2) * f - 1) * f / 2, ((3 * f - 5) * f * f + 2)
 /**
  * Paint one layer over a lat/lon box as a W x H Web Mercator image, as sharply as the data allows:
  * the data is read at its own resolution and bicubically (Catmull-Rom) interpolated to every pixel; relief shading
- * from the local gradient (light from the north-west) and a one-pixel contour line at every 1/16 of the layer range
- * turn fronts, ridges and basins into crisp shapes. Edges of the data fade over half a cell; no data is transparent.
+ * from the local gradient (light from the north-west) gives fronts and basins a soft relief. No contour lines: on data
+ * recovered from video colours they traced pixel noise as squiggles. Edges of the data fade over half a cell.
  */
 async function paint(layer: LayerInfo, date: string, box: BBox, W: number, H: number): Promise<Blob | null> {
   const n = Math.max(8, Math.min(720, Math.ceil(Math.max(box.east - box.west, box.north - box.south) / layer.resolutionDeg)));
@@ -106,22 +103,19 @@ async function paint(layer: LayerInfo, date: string, box: BBox, W: number, H: nu
       A[y * W + x] = Number.isNaN(v) ? 0 : 255 * a;
     }
   }
-  // 2. Colour, relief shading, contour lines.
+  // 2. Colour and gentle relief shading.
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d')!;
   const img = ctx.createImageData(W, H), px = img.data;
-  const lines = CONTOURED.has(layer.id);
-  const k = 3.5 / ((box.east - box.west) / W); // shading strength per unit of (range per degree)
+  const k = 1.2 / ((box.east - box.west) / W); // shading strength per unit of (range per degree)
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x, t = T[i];
     if (!A[i]) continue;
     const e = x < W - 1 && A[i + 1] ? T[i + 1] : t, s = y < H - 1 && A[i + W] ? T[i + W] : t;
-    const shade = Math.max(0.7, Math.min(1.3, 1 + k * (e - t + s - t)));
-    const lv = Math.floor(t * CONTOUR_LEVELS);
-    const edge = lines && (Math.floor(e * CONTOUR_LEVELS) !== lv || Math.floor(s * CONTOUR_LEVELS) !== lv);
+    const shade = Math.max(0.94, Math.min(1.06, 1 + k * (e - t + s - t)));
     const c = colour(t, layer.id);
-    for (let q = 0; q < 3; q++) px[i * 4 + q] = edge ? c[q] + (255 - c[q]) * 0.5 : Math.min(255, c[q] * shade);
+    for (let q = 0; q < 3; q++) px[i * 4 + q] = Math.min(255, c[q] * shade);
     px[i * 4 + 3] = A[i];
   }
   ctx.putImageData(img, 0, 0);
@@ -155,7 +149,7 @@ async function drawOverlay(map: maplibregl.Map) {
 
 /**
  * Zoomed in: the visible area again at screen resolution (one image pixel per screen pixel), so gradients stay
- * smooth and contour lines stay hair-thin at any zoom. Redrawn when the view settles.
+ * smooth at any zoom. Redrawn when the view settles.
  * ponytail: the patch stops at the antimeridian (the world image shows beyond it); split it in two if that matters.
  */
 let detailSeq = 0;

@@ -1,4 +1,4 @@
-import '@fontsource-variable/fraunces';
+import '@fontsource-variable/fraunces/full.css';
 import '@fontsource-variable/outfit';
 import { gsap } from 'gsap';
 import { createRoot } from 'react-dom/client';

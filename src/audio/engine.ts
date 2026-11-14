@@ -3,6 +3,7 @@ import type { LayerId, LayerInfo, WindowData } from '../data/types';
 import { fx } from '../fx';
 import { Field } from './field';
 import { Terrain } from './terrain';
+import { loadBuffer, pruneAudioCaches } from './cache';
 import { chordAt, type Mood } from './harmony';
 import { buildPattern, scanPan, STEPS, type Pattern, type Step } from './loop';
 import { scaleNotes, VOICES, type Instrument, type VoiceMapping } from './mapping';
@@ -225,12 +226,13 @@ class AudioEngine {
   }
 
   async init() {
+    pruneAudioCaches();
     const base = import.meta.env.BASE_URL + 'audio/';
     const manifest: Manifest = await fetch(base + 'manifest.json').then((r) => r.json());
     const load = async (map: Record<string, string>): Promise<Buffers> => {
       const out: Buffers = {};
       await Promise.all(Object.entries(map).map(async ([k, rel]) => {
-        try { out[k] = await new Tone.ToneAudioBuffer().load(base + rel); } catch { this.missing.push(rel); }
+        try { out[k] = await loadBuffer(base + rel); } catch { this.missing.push(rel); }
       }));
       return out;
     };
@@ -366,7 +368,7 @@ class AudioEngine {
   async playClip(url: string): Promise<void> {
     let buf = this.clips.get(url);
     if (!buf) {
-      buf = await new Tone.ToneAudioBuffer().load(url);
+      buf = await loadBuffer(url);
       this.clips.set(url, buf);
     }
     const b = buf;
