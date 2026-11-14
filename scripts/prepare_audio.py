@@ -29,7 +29,13 @@ INSTRUMENTS = {
     "glock":      (r"Percussion/Glock/glock_medium_([A-G]#?\d)\.wav", "G4", "G6", 2.0),
     "marimba":    (r"Percussion/Marimba/Marimba_hit_Outrigger_([A-G]#?\d)_loud_01\.wav", "F1", "C6", 1.5),
     "piano":      (r"Keys/Upright Nr1/UR1_([A-G]#?\d)_pp_RR1\.wav", "C2", "C6", 3.0),
+    # Severity voice: tremolo strings for the darkening drone.
+    "cellotrem":  (r"Strings/Cello Section/trem/trem_([A-G]#?\d)_v\d_1\.wav", "C1", "F4", 3.5),
 }
+
+RAIN = "https://upload.wikimedia.org/wikipedia/commons/4/4f/Falling_Rain_SFX_1_2016-11-19.oga"
+# Long recordings: only the first bytes are fetched (enough for the slice we use).
+PARTIAL = {RAIN: 4_000_000}
 
 # One-shots: (url, start seconds, duration seconds)
 ONESHOTS = {
@@ -47,9 +53,15 @@ ONESHOTS = {
     # Ambience beds under the loop: sea, land, mixed by the land/water share of the window.
     "oceanbed":    ("https://upload.wikimedia.org/wikipedia/commons/f/f1/Oceanwavescrushing.ogg", 60.0, 24.0),
     "landbed":     ("https://upload.wikimedia.org/wikipedia/commons/0/0e/Gentle_breeze_and_birds_singing.ogg", 2.0, 28.0),
+    # Cold land bed (high altitude) and the wind layer's texture.
+    "windbed":     ("https://upload.wikimedia.org/wikipedia/commons/2/2d/Howling_wind.ogg", 20.0, 24.0),
+    # Rain layer's texture.
+    "rain":        (RAIN, 30.0, 16.0),
+    # Severity heartbeat.
+    "timpani":     (VSCO + "Percussion/Timpani/Timpani2_Hit_v3_rr1_Sum.wav", 0, 2.5),
 }
-NO_SILENCE_TRIM = {"wave", "whoosh", "oceanbed", "landbed"}  # field-recording slices, start where asked
-LOOPED = {"whoosh", "oceanbed", "landbed"}  # tail crossfaded into head so it loops seamlessly
+NO_SILENCE_TRIM = {"wave", "whoosh", "oceanbed", "landbed", "windbed", "rain"}  # field-recording slices, start where asked
+LOOPED = {"whoosh", "oceanbed", "landbed", "windbed", "rain"}  # tail crossfaded into head so it loops seamlessly
 
 NOTE = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
 
@@ -63,7 +75,10 @@ def fetch(url):
     dest = CACHE / re.sub(r"[^A-Za-z0-9._-]", "_", urllib.parse.unquote(url.split("/", 3)[-1]))
     if not dest.exists():
         dest.parent.mkdir(parents=True, exist_ok=True)
-        req = urllib.request.Request(urllib.parse.quote(url, safe=":/"), headers={"User-Agent": "feel-the-earth-build/0.1"})
+        headers = {"User-Agent": "feel-the-earth-build/0.1"}
+        if url in PARTIAL:
+            headers["Range"] = f"bytes=0-{PARTIAL[url] - 1}"
+        req = urllib.request.Request(urllib.parse.quote(url, safe=":/"), headers=headers)
         dest.write_bytes(urllib.request.urlopen(req).read())
     return dest
 

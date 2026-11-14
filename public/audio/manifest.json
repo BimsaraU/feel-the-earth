@@ -99,6 +99,22 @@
    "G3": "piano/G3.mp3",
    "G4": "piano/G4.mp3",
    "G5": "piano/G5.mp3"
+  },
+  "cellotrem": {
+   "A2": "cellotrem/A2.mp3",
+   "B1": "cellotrem/B1.mp3",
+   "B2": "cellotrem/B2.mp3",
+   "B3": "cellotrem/B3.mp3",
+   "C1": "cellotrem/C1.mp3",
+   "C3": "cellotrem/C3.mp3",
+   "D2": "cellotrem/D2.mp3",
+   "D4": "cellotrem/D4.mp3",
+   "E1": "cellotrem/E1.mp3",
+   "E3": "cellotrem/E3.mp3",
+   "F2": "cellotrem/F2.mp3",
+   "F4": "cellotrem/F4.mp3",
+   "G1": "cellotrem/G1.mp3",
+   "G3": "cellotrem/G3.mp3"
   }
  },
  "oneshots": {
@@ -114,7 +130,10 @@
   "whoosh": "oneshots/whoosh.mp3",
   "windchime": "oneshots/windchime.mp3",
   "oceanbed": "oneshots/oceanbed.mp3",
-  "landbed": "oneshots/landbed.mp3"
+  "landbed": "oneshots/landbed.mp3",
+  "windbed": "oneshots/windbed.mp3",
+  "rain": "oneshots/rain.mp3",
+  "timpani": "oneshots/timpani.mp3"
  },
  "sources": [
   {
@@ -528,6 +547,76 @@
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
   },
   {
+   "file": "cellotrem/A2.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_A2_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/B1.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_B1_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/B2.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_B2_v2_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/B3.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_B3_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/C1.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_C1_v2_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/C3.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_C3_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/D2.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_D2_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/D4.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_D4_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/E1.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_E1_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/E3.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_E3_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/F2.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_F2_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/F4.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_F4_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/G1.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_G1_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
+   "file": "cellotrem/G3.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Strings/Cello Section/trem/trem_G3_v1_1.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
+  },
+  {
    "file": "oneshots/clave.mp3",
    "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Claves1_Hit_v2_rr1_Sum.wav",
    "licence": "CC0 1.0 (VSCO 2 Community Edition)"
@@ -591,6 +680,21 @@
    "file": "oneshots/landbed.mp3",
    "url": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Gentle_breeze_and_birds_singing.ogg",
    "licence": "see docs/CREDITS.md"
+  },
+  {
+   "file": "oneshots/windbed.mp3",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Howling_wind.ogg",
+   "licence": "see docs/CREDITS.md"
+  },
+  {
+   "file": "oneshots/rain.mp3",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Falling_Rain_SFX_1_2016-11-19.oga",
+   "licence": "see docs/CREDITS.md"
+  },
+  {
+   "file": "oneshots/timpani.mp3",
+   "url": "https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Timpani/Timpani2_Hit_v3_rr1_Sum.wav",
+   "licence": "CC0 1.0 (VSCO 2 Community Edition)"
   }
  ]
 }
