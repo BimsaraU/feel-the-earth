@@ -10,7 +10,7 @@ Stage 1 done-criteria and their status. "Not run" means nobody has done it yet; 
 | Loop generation deterministic, west-to-east | `npm test` (src/audio/loop.test.ts) | Passing |
 | Mapping table round-trips, MAPPING.md in sync | `npm test` (src/audio/mapping.test.ts) | Passing |
 | Spoken answers | `npm test` (src/assist/answers.test.ts) | Passing |
-| Smoke: load, unlock audio, move, toggle layer, both answers | `npm run e2e` (headless Chromium) | See latest run |
+| Smoke: load, unlock audio, move, toggle layer, both answers | `npm run e2e` (headless Chromium) | Passing (2026-11-14) |
 
 ## Manual (needs people and devices)
 
