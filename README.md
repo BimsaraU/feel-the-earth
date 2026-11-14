@@ -20,7 +20,7 @@ npm run mapping    # regenerate docs/MAPPING.md from src/audio/mapping.ts
 ```
 
 Assets are committed. To rebuild them (needs network):
-`python scripts/prepare_audio.py` and `python scripts/build_geo.py` and `python scripts/build_imagery.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
+`python scripts/prepare_audio.py` and `python scripts/build_geo.py` , `python scripts/build_imagery.py` and `python scripts/build_elevation.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
 
 ## Keys
 

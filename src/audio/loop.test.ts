@@ -1,19 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { FixtureSource, sampleWindow } from '../data/fixture';
-import { buildPattern, ROWS, STEPS } from './loop';
-import { voiceFor } from './mapping';
+import type { LayerInfo, WindowData } from '../data/types';
+import { chordAt, SCALES, type Mood } from './harmony';
+import { buildPattern, constantWindow, STEPS } from './loop';
+import { severity, VOICES, voiceFor } from './mapping';
 
 const layers = await new FixtureSource().listLayers();
-const temp = layers.find((l) => l.id === 'temperature')!;
+const L = (id: string) => layers.find((l) => l.id === id)!;
+const temp = L('temperature');
 const box = { west: 75.7, east: 85.7, south: 2.9, north: 12.9 };
-const stats = (mean: number) => ({ mean, min: mean, max: mean, variance: 0, gradientDeg: NaN, validFraction: 1 });
-const field = (n: number, f: (r: number, c: number) => number) => {
+const field = (layer: LayerInfo, n: number, f: (r: number, c: number) => number): WindowData => {
   const grid = new Float32Array(n * n);
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) grid[r * n + c] = f(r, c);
-  return grid;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) grid[r * n + c] = layer.min + f(r, c) * (layer.max - layer.min);
+  const mean = grid.reduce((a, v) => a + v, 0) / grid.length;
+  return { grid, n, stats: { mean, min: 0, max: 0, variance: 0, gradientDeg: NaN, validFraction: 1 } };
 };
+const pc = (m: number, key = 2) => (((m - key) % 12) + 12) % 12;
 
-describe('loop generation (scan sonification)', () => {
+describe('loop generation', () => {
   it('is deterministic for (window, layer, date)', () => {
     const a = buildPattern(sampleWindow('temperature', box, '2026-11-14', 32), temp, voiceFor('temperature'), 2);
     const b = buildPattern(sampleWindow('temperature', box, '2026-11-14', 32), temp, voiceFor('temperature'), 2);
@@ -27,28 +31,46 @@ describe('loop generation (scan sonification)', () => {
     expect(a).not.toEqual(b);
   });
 
-  it('a uniform field is one held chord: rows to pitch, north highest', () => {
-    const n = 12;
-    const p = buildPattern({ grid: field(n, () => 20), n, stats: stats(20) }, temp, voiceFor('temperature'), 2);
-    expect(p.steps[0].notes).toHaveLength(ROWS);
-    expect(p.steps.slice(1).every((s) => s.notes.length === 0)).toBe(true); // held, not retriggered
-    const midis = p.steps[0].notes.map((x) => x.midi);
-    expect(midis).toEqual([...midis].sort((a, b) => b - a)); // row 0 (north) first and highest
-    expect(p.steps[0].notes[0].dur).toBeGreaterThan(STEPS - 1);
+  it('harmonises: every voice stays in the shared chord of the bar (melody may pass through the scale)', () => {
+    for (const mood of [0, 1, 2] as Mood[]) {
+      for (const v of VOICES) {
+        const layer = L(v.layer);
+        const win = field(layer, 24, (r, c) => 0.2 + 0.6 * Math.abs(Math.sin(r * 1.3 + c * 0.7)));
+        buildPattern(win, layer, v, 2, mood).steps.forEach((s, i) => {
+          for (const n of s.notes) {
+            const allowed = v.role === 'melody' && i % 2 === 1 ? SCALES[mood] : chordAt(mood, Math.floor(i / 4));
+            expect(allowed, `${v.layer} mood ${mood} step ${i}`).toContain(pc(n.midi));
+          }
+        });
+      }
+    }
   });
 
-  it('value sets loudness: warmer east is louder', () => {
-    const n = 32;
-    const p = buildPattern({ grid: field(n, (_, c) => -40 + (80 * c) / n), n, stats: stats(0) }, temp, voiceFor('temperature'), 2);
-    const vel = p.steps.filter((s) => s.notes.length).map((s) => s.notes[0].vel);
+  it('value sets loudness: a field warming eastwards gets louder', () => {
+    const p = buildPattern(field(temp, 32, (_, c) => c / 32), temp, voiceFor('temperature'), 2);
+    const vel = p.steps.flatMap((s) => s.notes.map((n) => n.vel));
     expect(vel.length).toBeGreaterThan(3);
-    expect(vel).toEqual([...vel].sort((a, b) => a - b));
+    expect(vel.at(-1)!).toBeGreaterThan(vel[0]);
+  });
+
+  it('north-south position sets pitch height', () => {
+    const north = buildPattern(field(temp, 24, (r) => (r < 4 ? 0.9 : 0.1)), temp, voiceFor('temperature'), 2);
+    const south = buildPattern(field(temp, 24, (r) => (r > 19 ? 0.9 : 0.1)), temp, voiceFor('temperature'), 2);
+    const avg = (p: typeof north) => { const m = p.steps.flatMap((s) => s.notes.map((n) => n.midi)); return m.reduce((a, x) => a + x, 0) / m.length; };
+    expect(avg(north)).toBeGreaterThan(avg(south));
+  });
+
+  it('severity follows each layer\'s danger direction', () => {
+    expect(severity(voiceFor('co2'), 0.95)).toBe(1);
+    expect(severity(voiceFor('co2'), 0.2)).toBe(0);
+    expect(severity(voiceFor('o3'), 0.05)).toBe(1); // ozone hole: low is dangerous
+    expect(buildPattern(constantWindow(L('co2'), 0.95), L('co2'), voiceFor('co2'), 2).severity).toBe(1);
   });
 
   it('marks no-data columns', () => {
     const n = 16;
-    const p = buildPattern({ grid: new Float32Array(n * n).fill(NaN), n, stats: { ...stats(NaN), validFraction: 0 } }, temp, voiceFor('temperature'), 2);
-    expect(p.allNoData).toBe(true);
+    const win = { grid: new Float32Array(n * n).fill(NaN), n, stats: { mean: NaN, min: NaN, max: NaN, variance: NaN, gradientDeg: NaN, validFraction: 0 } };
+    expect(buildPattern(win, temp, voiceFor('temperature'), 2).allNoData).toBe(true);
   });
 
   it('fixture has no-data regions', () => {

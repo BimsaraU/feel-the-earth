@@ -16,13 +16,13 @@ test('load, unlock audio, move, toggle a layer, ask both questions', async ({ pa
   await expect(caption).toContainText('Date:');
 
   await page.keyboard.press('Digit2');
-  await expect(caption).toContainText('Wind speed on, the flute.');
-  await expect(page.getByRole('button', { name: /Wind speed/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(caption).toContainText('Wind speed on, the flute and the wind.');
+  await expect(page.getByRole('button', { name: /^2 Wind$/ })).toHaveAttribute('aria-pressed', 'true');
 
   await page.keyboard.press('KeyH');
   await expect(caption).toContainText('Demo data, not NASA data.');
   await expect(caption).toContainText('Surface air temperature');
-  await expect(caption).toContainText('You hear it as the flute.');
+  await expect(caption).toContainText('You hear it as the flute and the wind.');
 
   await page.getByRole('button', { name: /Where am I/ }).click();
   await expect(caption).toContainText('Window centre');

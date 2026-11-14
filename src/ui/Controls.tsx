@@ -8,10 +8,14 @@ import { runTutorial } from '../assist/tutorial';
 import { askWhat, askWhere, geo, toggleVoice, glideStart, glideStop, moveBy, setDate, setSize, sizeDone, stepDate, toggleLayer, togglePlay, type Dir } from '../controller';
 import type { LayerId } from '../data/types';
 import { MAX_SIZE, MIN_SIZE, useApp } from '../state';
+import { haptics } from '../haptics/haptics';
 import { colour } from './colour';
 import { zoomBy } from './Globe';
 
 const DAY = 86400000;
+const SHORT: Partial<Record<LayerId, string>> = {
+  temperature: 'Temperature', wind: 'Wind', precipitation: 'Rain', co2: 'CO₂', co: 'CO', no2: 'NO₂', o3: 'Ozone', pm25: 'PM2.5',
+};
 const toDays = (iso: string) => Math.round(Date.parse(iso + 'T00:00:00Z') / DAY);
 const fromDays = (d: number) => new Date(d * DAY).toISOString().slice(0, 10);
 const coord = (v: number, p: string, n: string) => `${Math.abs(v).toFixed(2)}° ${v >= 0 ? p : n}`;
@@ -146,7 +150,7 @@ function Layers() {
   const { layers, active } = useApp();
   return (
     <section className="card layers glass" aria-label="Layers">
-      <h2>Layers <span className="muted">keys 1–8 · up to 4</span></h2>
+      <h2>Layers <span className="muted">1–8</span></h2>
       <div className="chips">
         {VOICES.map((v) => {
           const l = layers.find((x) => x.id === v.layer);
@@ -155,7 +159,7 @@ function Layers() {
           return (
             <button key={v.layer} type="button" className="chip" aria-pressed={on} onClick={() => toggleLayer(v.layer)}>
               <kbd>{v.key}</kbd>
-              <span>{l.name.replace(/, PM2.5$/, '')}<small>{v.instrument} · {on ? 'on' : 'off'}</small></span>
+              <span>{SHORT[v.layer] ?? l.name}</span>
             </button>
           );
         })}
@@ -194,7 +198,7 @@ function DirButton({ dir, label, area }: { dir: Dir; label: string; area: string
 
 function Navigate() {
   const { size, settings, setSettings } = useApp();
-  const [open, setOpen] = useState(() => !matchMedia('(max-width: 860px)').matches);
+  const [open, setOpen] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (body.current) gsap.to(body.current, { height: open ? 'auto' : 0, opacity: open ? 1 : 0, duration: 0.45, ease: 'power3.inOut' });
@@ -279,15 +283,19 @@ function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void 
     <aside ref={el} className="drawer glass" aria-label="Settings" style={{ visibility: 'hidden' }}>
       <h2>Settings <button type="button" className="tool" onClick={onClose}>Close</button></h2>
       <label className="field">Master volume <input type="range" min={0} max={1} step={0.05} value={s.masterVolume} onChange={(e) => setSettings({ masterVolume: +e.target.value })} /></label>
-      {VOICES.map((v) => (
-        <label key={v.layer} className="field">{layers.find((l) => l.id === v.layer)?.name}
-          <input type="range" min={-18} max={6} step={1} value={s.layerDb[v.layer] ?? 0} aria-valuetext={`${s.layerDb[v.layer] ?? 0} decibels`}
-            onChange={(e) => setSettings({ layerDb: { ...s.layerDb, [v.layer]: +e.target.value } })} />
-        </label>
-      ))}
+      <details>
+        <summary>Layer volumes</summary>
+        {VOICES.map((v) => (
+          <label key={v.layer} className="field">{layers.find((l) => l.id === v.layer)?.name}
+            <input type="range" min={-18} max={6} step={1} value={s.layerDb[v.layer] ?? 0} aria-valuetext={`${s.layerDb[v.layer] ?? 0} decibels`}
+              onChange={(e) => setSettings({ layerDb: { ...s.layerDb, [v.layer]: +e.target.value } })} />
+          </label>
+        ))}
+      </details>
       <label className="field">Speech rate <input type="range" min={0.6} max={1.8} step={0.1} value={s.speechRate} onChange={(e) => setSettings({ speechRate: +e.target.value })} /></label>
       <label className="check"><input type="checkbox" checked={s.voice} onChange={(e) => setSettings({ voice: e.target.checked })} /> Voice guide: spoken help (off if your screen reader speaks)</label>
       <label className="check"><input type="checkbox" checked={s.haptics} onChange={(e) => setSettings({ haptics: e.target.checked })} /> Haptics</label>
+      <button type="button" className="tool" onClick={() => { haptics.pulse('test'); void say(`Haptics use ${haptics.describe()}.`); }}>Test haptics</button>
       <label className="check"><input type="checkbox" checked={s.hapticAccents} onChange={(e) => setSettings({ hapticAccents: e.target.checked })} /> Pulse on loop accents</label>
       <label className="field">Tempo {s.tempo} bpm <input type="range" min={50} max={110} step={1} value={s.tempo} onChange={(e) => setSettings({ tempo: +e.target.value })} /></label>
       <label className="field">Key
@@ -305,7 +313,7 @@ export function Controls() {
   const [settings, setSettingsOpen] = useState(false);
   const hud = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    if (hud.current) gsap.from(hud.current.querySelectorAll('.brand, .tools, .card, .timebar'), { opacity: 0, y: 18, filter: 'blur(8px)', duration: 0.9, stagger: 0.07, ease: 'power3.out' });
+    if (hud.current) gsap.from(hud.current.querySelectorAll('.brand, .tools, .card, .timebar'), { opacity: 0, y: 18, filter: 'blur(8px)', duration: 0.9, stagger: 0.07, ease: 'power3.out', clearProps: 'opacity,filter,transform' });
   }, []);
   return (
     <div className="hud" ref={hud}>

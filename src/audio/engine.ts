@@ -1,7 +1,8 @@
 import * as Tone from 'tone';
 import type { LayerId, LayerInfo, WindowData } from '../data/types';
+import { chordAt, type Mood } from './harmony';
 import { buildPattern, scanPan, STEPS, type Pattern, type Step } from './loop';
-import { VOICES, type Instrument, type VoiceMapping } from './mapping';
+import { scaleNotes, VOICES, type Instrument, type VoiceMapping } from './mapping';
 
 interface Manifest {
   instruments: Record<Instrument, Record<string, string>>;
@@ -15,11 +16,16 @@ const ENVELOPE: Record<Instrument, { attack: number; release: number }> = {
   cello: { attack: 0.06, release: 0.5 }, contrabass: { attack: 0.08, release: 0.6 }, clarinet: { attack: 0.04, release: 0.4 },
   oboe: { attack: 0.04, release: 0.4 }, flute: { attack: 0.01, release: 0.25 }, harp: { attack: 0, release: 1.2 },
   glock: { attack: 0, release: 1.5 }, marimba: { attack: 0, release: 0.8 }, piano: { attack: 0, release: 0.8 },
+  cellotrem: { attack: 0.4, release: 1.2 },
 };
+
+/** What every voice reads from the conductor: key and the ensemble's mood. */
+interface Score { keyRoot: number; mood: Mood }
 
 const hz = (midi: number) => Tone.Frequency(midi, 'midi').toFrequency();
 
-/** One data layer's voice: two sampler lanes for equal-power crossfades between loops, per-layer EQ, pan, level. */
+/** One data layer's voice: two sampler lanes for equal-power crossfades between loops, character filters,
+ *  an optional recorded texture (wind, rain), pan, level. */
 export class Voice {
   private lanes: Tone.Sampler[];
   private xfade = new Tone.CrossFade(0);
@@ -28,6 +34,7 @@ export class Voice {
   private panner: Tone.Panner;
   private level = new Tone.Gain(0);
   private piano: Tone.Sampler;
+  private texture: Tone.Gain | null = null;
   private patterns: (Pattern | null)[] = [null, null];
   private active = 0;
   private pending: Pattern | null = null;
@@ -35,32 +42,49 @@ export class Voice {
   userDb = 0;
   current: Pattern | null = null;
 
-  constructor(readonly map: VoiceMapping, buffers: Buffers, pianoBuffers: Buffers, out: Tone.InputNode, private keyRoot: () => number) {
+  constructor(readonly map: VoiceMapping, buffers: Buffers, pianoBuffers: Buffers, out: Tone.InputNode, private score: Score, textureBuf?: Tone.ToneAudioBuffer) {
     const env = ENVELOPE[map.instrument];
     this.lanes = [0, 1].map(() => new Tone.Sampler({ urls: buffers, ...env }));
     this.lanes[0].connect(this.xfade.a);
     this.lanes[1].connect(this.xfade.b);
-    this.hp = new Tone.Filter(map.band[0], 'highpass');
-    this.lp = new Tone.Filter(map.band[1], 'lowpass');
+    this.hp = new Tone.Filter(map.timbre.hp[0], 'highpass');
+    this.lp = new Tone.Filter(map.timbre.lp[0], 'lowpass');
     this.panner = new Tone.Panner(map.pan);
     this.xfade.chain(this.hp, this.lp, this.panner, this.level, out);
     // The felt piano: soft upright piano notes behind a low-pass, the "no data" pulse.
     const felt = new Tone.Filter(1100, 'lowpass');
     this.piano = new Tone.Sampler({ urls: pianoBuffers, attack: 0.01, release: 0.6 });
     this.piano.chain(felt, this.panner);
+    if (textureBuf) {
+      this.texture = new Tone.Gain(0);
+      new Tone.Player({ url: textureBuf, loop: true, loopStart: 0.06, loopEnd: textureBuf.duration - 0.06 })
+        .chain(this.texture, new Tone.Panner(map.pan), out).start();
+    }
+  }
+
+  private build(win: WindowData, layer: LayerInfo) {
+    return buildPattern(win, layer, this.map, this.score.keyRoot, this.score.mood);
+  }
+
+  /** Character filters and texture follow the data; ramps keep every change smooth. */
+  private applyCharacter(p: Pattern, ramp: number, time?: number) {
+    this.lp.frequency.rampTo(p.lpHz, ramp, time);
+    this.lp.Q.rampTo(p.q, ramp, time);
+    this.hp.frequency.rampTo(p.hpHz, ramp, time);
+    this.texture?.gain.rampTo(this.enabled && p.textureDb > -Infinity ? Tone.dbToGain(p.textureDb + this.userDb) : 0, Math.max(ramp, 0.3), time);
   }
 
   /** Queue a new loop from window data. It swaps in at the next bar line. */
   render(win: WindowData, layer: LayerInfo) {
-    this.pending = buildPattern(win, layer, this.map, this.keyRoot());
+    this.pending = this.build(win, layer);
     if (!this.current) this.swap(Tone.now());
     return this.pending ?? this.current!;
   }
 
   /** Drag preview: filter, pan and level follow the data continuously; notes stay until release. */
   scrub(win: WindowData, layer: LayerInfo) {
-    const p = buildPattern(win, layer, this.map, this.keyRoot());
-    this.lp.frequency.rampTo(p.cutoffHz, 0.1);
+    const p = this.build(win, layer);
+    this.applyCharacter(p, 0.12);
     if (this.enabled) this.level.gain.rampTo(this.gainFor(p), 0.1);
   }
 
@@ -82,6 +106,8 @@ export class Voice {
 
   private applyLevel(ramp: number) {
     this.level.gain.rampTo(this.enabled ? this.gainFor(this.current) : 0, ramp);
+    if (this.current) this.applyCharacter(this.current, ramp);
+    else if (!this.enabled) this.texture?.gain.rampTo(0, ramp);
   }
 
   private swap(time: number) {
@@ -91,7 +117,7 @@ export class Voice {
     this.current = this.pending;
     this.pending = null;
     this.xfade.fade.rampTo(this.active, 0.4, time); // CrossFade is equal-power
-    this.lp.frequency.rampTo(this.current.cutoffHz, 0.4, time);
+    this.applyCharacter(this.current, 0.4, time);
     this.level.gain.rampTo(this.enabled ? this.gainFor(this.current) : 0, 0.4, time);
   }
 
@@ -114,7 +140,7 @@ export class Voice {
 
   private trigger(step: Step, time: number, stepSec: number, lane: Tone.Sampler) {
     if (step.noData) {
-      this.piano.triggerAttackRelease(hz(60 + this.keyRoot()), stepSec * 0.5, time, 0.25);
+      this.piano.triggerAttackRelease(hz(60 + this.score.keyRoot), stepSec * 0.5, time, 0.25);
       return;
     }
     for (const n of step.notes) lane.triggerAttackRelease(hz(n.midi), Math.max(0.05, n.dur * stepSec), time + n.offset * stepSec, n.vel);
@@ -125,15 +151,18 @@ export class Voice {
   }
 }
 
-export type OneShot = 'clave' | 'framedrum' | 'smallbell' | 'gong' | 'cymbal' | 'ratchet' | 'thump' | 'singingbowl' | 'wave' | 'whoosh' | 'windchime' | 'oceanbed' | 'landbed';
+export type OneShot = 'clave' | 'framedrum' | 'smallbell' | 'gong' | 'cymbal' | 'ratchet' | 'thump' | 'singingbowl' | 'wave' | 'whoosh' | 'windchime' | 'oceanbed' | 'landbed' | 'windbed' | 'rain' | 'timpani';
 
-export interface PlayOpts { rate?: number; db?: number; at?: number; reverse?: boolean; lowpass?: number }
+export interface PlayOpts { rate?: number; db?: number; at?: number; reverse?: boolean; lowpass?: number; music?: boolean }
 
 class AudioEngine {
   ready = false;
   missing: string[] = [];
   voices = new Map<LayerId, Voice>();
   keyRoot = 2; // D
+  /** Ensemble severity 0..1 (worst active layer) and the mood it selects. Set by the controller. */
+  severity = 0;
+  mood: Mood = 0;
   onAccent: (() => void) | null = null;
   firstLayer: LayerId | null = null;
 
@@ -147,6 +176,7 @@ class AudioEngine {
   private whooshGain!: Tone.Gain;
   private manyTimer = 0;
   private beds: Record<string, Tone.Gain> = {};
+  private drone: Tone.Sampler | null = null;
   private speaking = false;
   private eventUntil = 0;
 
@@ -199,12 +229,23 @@ class AudioEngine {
     await Promise.all(VOICES.map(async (map) => {
       const bufs = await load(manifest.instruments[map.instrument] ?? {});
       if (!Object.keys(bufs).length) { this.missing.push(`instrument ${map.instrument}`); return; }
-      const v = new Voice(map, bufs, piano, this.stack, () => this.keyRoot);
+      const v = new Voice(map, bufs, piano, this.stack, this, map.texture ? this.shots[map.texture.sample] : undefined);
       this.voices.set(map.layer, v);
     }));
 
-    // Ambience beds: sea and land recordings, mixed by the land share of the window. Kept very quiet.
-    for (const [name, filter] of [['oceanbed', new Tone.Filter(1400, 'lowpass')], ['landbed', new Tone.Filter(250, 'highpass')]] as const) {
+    // Severity drone: tremolo strings on the chord root and fifth, entering as the ensemble gets uneasy.
+    const trem = await load(manifest.instruments.cellotrem ?? {});
+    if (Object.keys(trem).length) {
+      this.drone = new Tone.Sampler({ urls: trem, ...ENVELOPE.cellotrem });
+      this.drone.chain(new Tone.Filter(1200, 'lowpass'), new Tone.Gain(Tone.dbToGain(-6)), this.stack);
+    } else this.missing.push('instrument cellotrem');
+
+    // Ambience beds: sea, warm land (breeze and birds), chilly land (mountain wind). Kept very quiet.
+    for (const [name, filter] of [
+      ['oceanbed', new Tone.Filter(1400, 'lowpass')],
+      ['landbed', new Tone.Filter(3500, 'lowpass')],
+      ['windbed', new Tone.Filter(600, 'highpass')],
+    ] as const) {
       const buf = this.shots[name];
       if (!buf) continue;
       const g = new Tone.Gain(0);
@@ -239,6 +280,20 @@ class AudioEngine {
         Tone.getDraw().schedule(cb, time);
       }
     }
+    // Conductor: the ensemble's severity adds a tremolo drone and, when severe, a timpani heartbeat.
+    if (enabled && i % 4 === 0) {
+      const root = chordAt(this.mood, i / 4)[0];
+      const [low] = scaleNotes(this.keyRoot, 38, 49, [root]);
+      if (this.drone && this.severity > 0.34) {
+        const v = 0.15 + 0.55 * ((this.severity - 0.34) / 0.66);
+        this.drone.triggerAttackRelease([hz(low), hz(low + 7)], 4 * stepSec, time, v);
+      }
+      if (this.severity > 0.67) {
+        const db = -16 + 10 * ((this.severity - 0.67) / 0.33);
+        this.play('timpani', { at: time, db, lowpass: 900, music: true });
+        this.play('timpani', { at: time + 0.3 * stepSec, db: db - 5, rate: 0.94, lowpass: 900, music: true });
+      }
+    }
     // No layer on: a quiet felt-piano pulse on each bar so the app is never silent.
     if (!enabled && i % 4 === 0) this.voices.get('temperature')?.preview({ notes: [], noData: true, accent: false, value: NaN }, time, stepSec);
   }
@@ -257,10 +312,11 @@ class AudioEngine {
     const src = new Tone.ToneBufferSource({ url: buf, playbackRate: o.rate ?? 1 });
     const g = new Tone.Gain(Tone.dbToGain(o.db ?? 0));
     const lp = o.lowpass ? new Tone.Filter(o.lowpass, 'lowpass') : null;
-    if (lp) src.chain(lp, g, this.events); else src.chain(g, this.events);
+    const bus = o.music ? this.stack : this.events;
+    if (lp) src.chain(lp, g, bus); else src.chain(g, bus);
     src.onended = () => { src.dispose(); g.dispose(); lp?.dispose(); };
     src.start(o.at ?? Tone.immediate());
-    this.duckForEvent(buf.duration / (o.rate ?? 1));
+    if (!o.music) this.duckForEvent(buf.duration / (o.rate ?? 1));
   }
 
   private duckForEvent(sec: number) {
@@ -276,7 +332,7 @@ class AudioEngine {
 
   private applyDuck() {
     if (!this.duck) return;
-    const db = this.speaking ? -9 : Tone.immediate() < this.eventUntil ? -3 : 0;
+    const db = this.speaking ? -9 : Tone.immediate() < this.eventUntil ? -1.5 : 0;
     this.duck.gain.rampTo(Tone.dbToGain(db), 0.05);
   }
 
@@ -286,18 +342,23 @@ class AudioEngine {
     if (!on) return;
     const rates = [1, 1.19, 0.94, 1.12];
     let k = 0;
-    this.manyTimer = window.setInterval(() => this.play('clave', { rate: rates[k++ % 4], db: -16 }), 110);
+    this.manyTimer = window.setInterval(() => this.play('clave', { rate: rates[k++ % 4], db: -30, lowpass: 2000 }), 110);
   }
 
   setMoveSpeed(degPerSec: number) {
     this.whooshGain?.gain.rampTo(Math.min(1, degPerSec / 40) * 0.6, 0.08);
   }
 
-  /** landShare 0 = all water, 1 = all land. Equal-power mix of the two beds. */
-  setSurface(landShare: number) {
+  /**
+   * landShare 0 = all water, 1 = all land; chill 0 = lowland (warm), 1 = high mountains (chilly).
+   * Equal-power mixes: sea vs land, then warm vs chilly land.
+   */
+  setSurface(landShare: number, chill: number) {
     const bed = Tone.dbToGain(-20);
+    const land = Math.sin((landShare * Math.PI) / 2);
     this.beds.oceanbed?.gain.rampTo(bed * Math.cos((landShare * Math.PI) / 2), 0.25);
-    this.beds.landbed?.gain.rampTo(bed * Math.sin((landShare * Math.PI) / 2), 0.25);
+    this.beds.landbed?.gain.rampTo(bed * land * Math.cos((chill * Math.PI) / 2), 0.4);
+    this.beds.windbed?.gain.rampTo(bed * 0.8 * land * Math.sin((chill * Math.PI) / 2), 0.4);
   }
 
   /** Position of the scan line in the loop, 0..1 (west to east). */

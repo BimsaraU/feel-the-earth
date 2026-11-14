@@ -1,7 +1,8 @@
 // Glue between input, state, data, geo, audio, haptics and speech.
 
 import { engine } from './audio/engine';
-import { voiceFor } from './audio/mapping';
+import { moodOf } from './audio/harmony';
+import { norm, severity, voiceFor } from './audio/mapping';
 import { placeName, spokenDate, whatAmIHearing, whereAmI } from './assist/answers';
 import { announce, say } from './assist/speech';
 import { source } from './data';
@@ -82,8 +83,12 @@ async function regenerate() {
   const { lat, lon, size, date, active } = st();
   const box = bboxOf(lat, lon, size);
   const means: Partial<Record<LayerId, number>> = {};
-  await Promise.all(active.map(async (id) => {
-    const win = await source.getWindow(id, box, date, 32);
+  const wins = await Promise.all(active.map((id) => source.getWindow(id, box, date, 32)));
+  // Conductor: the most dangerous active layer sets the ensemble's severity and mood for every voice.
+  engine.severity = Math.max(0, ...active.map((id, k) => severity(voiceFor(id), norm(wins[k].stats.mean, layerInfo(id)))));
+  engine.mood = moodOf(engine.severity);
+  await Promise.all(active.map(async (id, k) => {
+    const win = wins[k];
     means[id] = win.stats.mean;
     const pattern = engine.voices.get(id)?.render(win, layerInfo(id));
     const noData = !!pattern?.steps.some((s) => s.noData);
@@ -156,7 +161,10 @@ export function moveBy(dLat: number, dLon: number) {
 
 function updateSurface() {
   const { lat, lon, size } = st();
-  if (geo) engine.setSurface(geo.landShare(bboxOf(lat, lon, size)));
+  if (!geo) return;
+  const box = bboxOf(lat, lon, size);
+  // Chill: 0 at sea level, 1 at 3,000 m and above.
+  engine.setSurface(geo.landShare(box), Math.min(1, geo.landElevation(box) / 3000));
 }
 
 // Smooth gliding: held arrows move at settings.navSpeed window widths per second, with eased start and stop.
@@ -316,15 +324,15 @@ export function sayDate() {
 export function playEvent(e: GeoEvent) {
   switch (e.type) {
     case 'border': {
-      engine.play('clave');
+      engine.play('clave', { db: -24, lowpass: 2200 });
       // Second tick higher when entering a country.
-      engine.play('clave', { at: engine.now() + 0.12, rate: 1.26 });
+      engine.play('clave', { at: engine.now() + 0.12, rate: 1.26, db: -26, lowpass: 2200 });
       haptics.pulse('border');
       break;
     }
     case 'coast':
-      if (e.to === 'sea') engine.play('wave', { db: -2 });
-      else engine.play('framedrum');
+      if (e.to === 'sea') engine.play('wave', { db: -20, lowpass: 1500 });
+      else engine.play('framedrum', { db: -20, lowpass: 600 });
       haptics.pulse('coast');
       break;
     case 'line':
@@ -360,7 +368,7 @@ export async function askWhat() {
     voice: voiceFor(id),
     mean: (await source.getWindow(id, box, date, 32)).stats.mean,
   })));
-  void say(whatAmIHearing(items));
+  void say(whatAmIHearing(items, engine.severity));
 }
 
 export function togglePlay() {

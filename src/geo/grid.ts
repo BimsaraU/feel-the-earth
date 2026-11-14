@@ -15,7 +15,11 @@ export class GeoGrid {
   readonly country: Uint8Array;
   readonly sea: Uint8Array;
 
-  constructor(bytes: Uint8Array, readonly meta: GeoMeta) {
+  /** Land elevation in 25 m steps (0 = sea level or below), same cells as the country grid. */
+  readonly elevation: Uint8Array | null;
+
+  constructor(bytes: Uint8Array, readonly meta: GeoMeta, elevation?: Uint8Array) {
+    this.elevation = elevation ?? null;
     const n = meta.width * meta.height;
     this.country = bytes.subarray(0, n);
     this.sea = bytes.subarray(n, 2 * n);
@@ -51,6 +55,17 @@ export class GeoGrid {
       if (this.countryId(lat, lon) > 0) land++;
     }
     return land / 100;
+  }
+
+  /** Mean elevation of the land in a box, metres (0 when the box is all sea). */
+  landElevation(box: { west: number; east: number; south: number; north: number }): number {
+    if (!this.elevation) return 0;
+    let sum = 0, k = 0;
+    for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) {
+      const c = this.cell(box.south + ((i + 0.5) * (box.north - box.south)) / 10, box.west + ((j + 0.5) * (box.east - box.west)) / 10);
+      if (this.country[c] > 0) { sum += this.elevation[c] * 25; k++; }
+    }
+    return k ? sum / k : 0;
   }
 
   /** Ring search outwards for the nearest cell whose land state differs. Called on demand, not per frame. */
@@ -91,9 +106,10 @@ const POINTS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-wes
 export const compassWord = (deg: number) => POINTS[Math.round(deg / 45) % 8];
 
 export async function loadGeo(base = import.meta.env.BASE_URL): Promise<GeoGrid> {
-  const [bin, meta] = await Promise.all([
+  const [bin, meta, elev] = await Promise.all([
     fetch(`${base}data/geo/grid.bin`).then((r) => r.arrayBuffer()),
     fetch(`${base}data/geo/meta.json`).then((r) => r.json()),
+    fetch(`${base}data/geo/elevation.bin`).then((r) => r.arrayBuffer()),
   ]);
-  return new GeoGrid(new Uint8Array(bin), meta);
+  return new GeoGrid(new Uint8Array(bin), meta, new Uint8Array(elev));
 }

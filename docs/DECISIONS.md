@@ -75,3 +75,21 @@ Non-obvious choices, newest last. Each entry: what, why, how to undo.
 34. **Voice guide toggle** (toolbar button and V key). Off means no speech at all; every message still goes to the caption and the aria-live region, so screen-reader users keep it.
 
 35. **Precache size** grew to about 16 MB (1,481 files, mostly map tiles). First visit on a slow connection takes longer; all later visits are offline.
+
+## 2026-11-14 Stage 1, round 3 (harmony, severity, altitude, haptics)
+
+36. **Shared harmony replaces per-layer pentatonic clusters** (supersedes the pitch part of 24 and 25). Six-row pentatonic chords from several unrelated layers stacked into clusters. Now a conductor holds one chord per bar from a 4-chord progression and every voice takes its notes from that chord, the way orchestral sections share a progression. Each layer has an orchestral role (bass, pad, melody, arp, colour, pulse) that limits how many notes it plays. The Chandra reading is kept: west-to-east scan, north-south position to pitch height, value to loudness, peaks to strikes. A unit test checks that every voice in every mood stays in the bar's chord (the melody may pass through the scale on weak beats).
+
+37. **Severity transforms the score.** Each layer declares when it is dangerous (CO2, CO, NO2, PM2.5, heat, storm wind and flooding rain when high; ozone when low). The worst active layer sets the ensemble severity. Calm: Dm9, G, Fmaj7, Cadd9 (open D dorian). Uneasy: Dm, Bb, Gm, Asus4 (natural minor) plus a tremolo-string drone. Severe: Dm, Bbmaj7, C#dim7, A7b9 (harmonic minor) plus a timpani heartbeat. The progression always resolves to D minor at the loop start, so even the severe version stays tonal.
+
+38. **Character filters per feature.** Each layer's filters follow its window mean so the timbre matches the meaning: cold air thin and icy, hot air dark and full; CO2 darker with a resonant growl; NO2 nasal; PM2.5 muffled as if through smog; ozone bells brighter when the layer is thick and sparse over an ozone hole. Wind and rain add recorded textures (howling wind, falling rain) whose level follows the value.
+
+39. **Gradients shape dynamics.** The change in value from one beat to the next scales loudness (rising swells to x1.4, falling recedes to x0.6). A change steeper than 12 % of the range per beat is a front: a short accented note. Bass splits the bar root-then-fifth when the bar rises.
+
+40. **Altitude.** Land ambience mixes a warm bed (breeze and birds, darker) with a chilly bed (howling mountain wind, high-passed) by the mean elevation of the land in the window: warm at sea level, chilly from 3,000 m. Elevation is NOAA ETOPO5, block-averaged to the 0.25-degree raster (`scripts/build_elevation.py`, 1 MB).
+
+41. **Crossings are very subtle now:** border ticks at -24/-26 dB through a 2.2 kHz low-pass, wave wash and land touch at -20 dB, low-passed; ducking under events reduced from 3 to 1.5 dB. Haptic pulses carry most of the crossing.
+
+42. **Haptics on tablets.** Root cause: Chrome on Android tablets sends a desktop user agent by default, so the old `/Android/` check fell through to the audio thump. Now any touch device with `navigator.vibrate` uses it. iPhone Safari (iOS 18+) gets system haptics through the native switch-control trick. iPads have no vibration motor and Safari has no Vibration API, so iPad web cannot vibrate; it keeps the thump. Settings has a "Test haptics" button that says which driver is in use.
+
+43. **Quieter menus.** Glass panels are more transparent and brighten on hover or focus; no visible scroll bars; Navigate starts collapsed; layer chips show short names only (state is aria-pressed and the lit outline).

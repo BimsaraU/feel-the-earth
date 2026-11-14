@@ -1,24 +1,29 @@
 // Pure, deterministic: window grid in, 16-step pattern out.
-// Method follows NASA Chandra's sonifications (Arcand, Russo, Santaguida): a line scans the image
-// left to right (here west to east), vertical position sets pitch (north = higher), brightness
-// (here the data value) sets loudness, diffuse regions sound as held tones and compact peaks as strikes.
+// Reading follows NASA Chandra's sonifications (Arcand, Russo, Santaguida): a line scans the window
+// west to east, north-south position sets pitch height, the value sets loudness, peaks are strikes.
+// Writing follows orchestral practice: each layer has a role (bass, pad, melody, arp, colour, pulse)
+// and every note comes from the shared chord of the bar, so independent data still harmonises.
 
 import type { LayerInfo, WindowData } from '../data/types';
-import { denorm, norm, scaleNotes, type VoiceMapping } from './mapping';
+import { chordAt, SCALES, type Mood } from './harmony';
+import { denorm, norm, scaleNotes, severity, span, type VoiceMapping } from './mapping';
 
 export const STEPS = 16;
 export const ROWS = 6;
-/** Minor pentatonic, a subset of D dorian: any combination of rows stays consonant. */
-export const PENTATONIC = [0, 3, 5, 7, 10];
-/** A held tone continues while the value stays within this share of the range. */
-const HOLD = 0.06;
+const HOLD = 0.06; // melody holds while the value stays within 6 % of the range
+const FRONT = 0.12; // a steeper change per beat than this is a front: accented
 
 export interface Note { midi: number; offset: number; dur: number; vel: number } // offset, dur in steps
 export interface Step { notes: Note[]; noData: boolean; accent: boolean; value: number }
 export interface Pattern {
   steps: Step[];
   windowNorm: number;
-  cutoffHz: number;
+  /** This layer's danger, 0..1, for the ensemble mood. */
+  severity: number;
+  hpHz: number;
+  lpHz: number;
+  q: number;
+  textureDb: number;
   /** Home pan including the gradient nudge; the scan sweeps around it. */
   pan: number;
   allNoData: boolean;
@@ -43,47 +48,128 @@ export function cells(win: WindowData, layer: LayerInfo): Float64Array {
   return out;
 }
 
-/** Column mean and variance over rows, for accents and articulation. */
-function column(c: Float64Array, s: number) {
-  let sum = 0, sq = 0, k = 0;
-  for (let r = 0; r < ROWS; r++) {
-    const t = c[r * STEPS + s];
-    if (!Number.isNaN(t)) { sum += t; sq += t * t; k++; }
-  }
-  const mean = k ? sum / k : NaN;
-  return { mean, variance: k ? Math.max(0, sq / k - mean * mean) : NaN };
-}
+const vel = (t: number) => 0.12 + 0.7 * t ** 1.3;
+const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
+const nearest = (tones: number[], target: number) => tones.reduce((a, b) => (Math.abs(b - target) < Math.abs(a - target) ? b : a), tones[0]);
 
-export function buildPattern(win: WindowData, layer: LayerInfo, voice: VoiceMapping, keyRoot: number): Pattern {
+export function buildPattern(win: WindowData, layer: LayerInfo, voice: VoiceMapping, keyRoot: number, mood: Mood = 0): Pattern {
   const c = cells(win, layer);
-  const scale = scaleNotes(keyRoot, voice.register[0], voice.register[1], PENTATONIC);
-  // ROWS pitches spread over the register, highest for the northern row.
-  const pitch = Array.from({ length: ROWS }, (_, r) => scale[Math.round(((ROWS - 1 - r) * (scale.length - 1)) / (ROWS - 1))]);
-  const cols = Array.from({ length: STEPS }, (_, s) => column(c, s));
   const at = (r: number, s: number) => (r < 0 || r >= ROWS ? NaN : c[r * STEPS + ((s + STEPS) % STEPS)]);
+  const [lo, hi] = voice.register;
+
+  // Per column: mean, height of the strongest features (north = 1), gradient along the scan.
+  const cols = Array.from({ length: STEPS }, (_, s) => {
+    let sum = 0, k = 0, hw = 0, w = 0;
+    for (let r = 0; r < ROWS; r++) {
+      const t = at(r, s);
+      if (Number.isNaN(t)) continue;
+      sum += t; k++;
+      hw += t * t * (1 - r / (ROWS - 1)); w += t * t;
+    }
+    return { mean: k ? sum / k : NaN, height: w ? hw / w : 0.5 };
+  });
+  const grad = cols.map((col, s) => {
+    const p = cols[(s + STEPS - 1) % STEPS].mean;
+    return Number.isNaN(col.mean) || Number.isNaN(p) || s === 0 ? 0 : col.mean - p;
+  });
+  // Gradient shapes dynamics: rising swells, falling recedes.
+  const dyn = (s: number) => clamp(1 + 2 * grad[s], 0.6, 1.4);
 
   const steps: Step[] = cols.map(({ mean }, s) => {
     const prev = cols[(s + STEPS - 1) % STEPS].mean, next = cols[(s + 1) % STEPS].mean;
     return { notes: [], noData: Number.isNaN(mean), accent: !(mean <= prev) && !(mean <= next), value: mean };
   });
+  const tones = (pcs: number[]) => scaleNotes(keyRoot, lo, hi, pcs);
+  const chord = (s: number) => chordAt(mood, Math.floor(s / 4));
+  const push = (s: number, n: Note) => { if (!steps[s].noData) steps[s].notes.push(n); };
+  const barMean = (b: number) => {
+    const v = cols.slice(b * 4, b * 4 + 4).map((x) => x.mean).filter((x) => !Number.isNaN(x));
+    return v.length ? v.reduce((a, x) => a + x, 0) / v.length : NaN;
+  };
 
-  for (let r = 0; r < ROWS; r++) {
-    let s = 0;
-    while (s < STEPS) {
-      const t = at(r, s);
-      if (Number.isNaN(t)) { s++; continue; }
-      // Run of similar values: one held tone, like the diffuse light in Chandra's pieces.
-      let len = 1;
-      while (s + len < STEPS && Math.abs(at(r, s + len) - t) < HOLD) len++;
-      // Compact peak (brighter than all four neighbours): a short accented strike.
-      const peak = [at(r - 1, s), at(r + 1, s), at(r, s - 1), at(r, s + 1)].every((v) => !(v >= t - 0.04));
-      // Rough columns are played detached; smooth ones legato.
-      const rough = Math.min(1, Math.sqrt(cols[s].variance || 0) / 0.15);
-      const dur = peak ? 0.5 : Math.max(0.35, len - 0.6 * rough);
-      const vel = Math.min(1, (0.05 + 0.75 * t ** 1.5) * (peak ? 1.3 : 1));
-      if (t > 0.03) steps[s].notes.push({ midi: pitch[r], offset: 0, dur, vel });
-      s += len;
+  switch (voice.role) {
+    case 'bass':
+      for (let b = 0; b < 4; b++) {
+        const t = barMean(b);
+        if (Number.isNaN(t)) continue;
+        const root = tones([chord(b * 4)[0]])[0];
+        const rising = cols[b * 4 + 3].mean - cols[b * 4].mean > 0.08;
+        if (rising) {
+          push(b * 4, { midi: root, offset: 0, dur: 2, vel: vel(t) * dyn(b * 4) });
+          push(b * 4 + 2, { midi: root + 7 <= hi ? root + 7 : root - 5, offset: 0, dur: 2, vel: vel(t) * dyn(b * 4 + 2) });
+        } else push(b * 4, { midi: root, offset: 0, dur: 3.9, vel: vel(t) });
+      }
+      break;
+    case 'pad':
+      for (let b = 0; b < 4; b++) {
+        const t = barMean(b);
+        if (Number.isNaN(t)) continue;
+        const ch = chord(b * 4);
+        const inner = tones(ch.length >= 3 ? ch.slice(1) : ch);
+        const h = cols.slice(b * 4, b * 4 + 4).reduce((a, x) => a + x.height, 0) / 4;
+        const target = lo + h * (hi - lo);
+        const two = [...inner].sort((x, y) => Math.abs(x - target) - Math.abs(y - target)).slice(0, 2);
+        for (const m of two) push(b * 4, { midi: m, offset: 0, dur: 3.9, vel: vel(t) * 0.8 });
+      }
+      break;
+    case 'melody': {
+      let last: Note | null = null, lastT = NaN;
+      for (let s = 0; s < STEPS; s++) {
+        const t = cols[s].mean;
+        if (Number.isNaN(t)) { last = null; continue; }
+        // Strong beats land on chord tones; weak beats may pass through the mood's scale.
+        const pcs = s % 2 === 0 ? chord(s) : SCALES[mood];
+        const target = lo + cols[s].height * (hi - lo);
+        const prevMidi: number = last?.midi ?? target;
+        const cand = tones(pcs);
+        const midi: number = cand.reduce((a, m) => (Math.abs(m - target) + 0.6 * Math.abs(m - prevMidi) < Math.abs(a - target) + 0.6 * Math.abs(a - prevMidi) ? m : a), cand[0]);
+        const front = Math.abs(grad[s]) > FRONT;
+        if (last && midi === last.midi && Math.abs(t - lastT) < HOLD && !front && s % 4 !== 0) { last.dur += 1; continue; }
+        last = { midi, offset: 0, dur: front ? 0.5 : 1, vel: clamp(vel(t) * dyn(s) * (front ? 1.25 : 1), 0, 1) };
+        lastT = t;
+        push(s, last);
+      }
+      break;
     }
+    case 'arp':
+      for (let s = 0; s < STEPS; s++) {
+        const t = cols[s].mean;
+        if (Number.isNaN(t)) continue;
+        const ct = tones(chord(s));
+        const count = 1 + Math.round(t * 3);
+        let i = ct.indexOf(nearest(ct, lo + cols[s].height * (hi - lo)));
+        const dir = grad[s] >= 0 ? 1 : -1; // rising values arpeggiate upwards
+        for (let k = 0; k < count; k++) {
+          push(s, { midi: ct[clamp(i, 0, ct.length - 1)], offset: k / count, dur: 0.9 / count, vel: vel(t) * dyn(s) * 0.9 });
+          i += dir;
+          if (i < 0 || i >= ct.length) i -= 2 * dir;
+        }
+      }
+      break;
+    case 'color':
+      for (let s = 0; s < STEPS; s++) {
+        const ct = tones(chord(s));
+        let n = 0;
+        for (let r = 0; r < ROWS && n < 2; r++) {
+          const t = at(r, s);
+          if (!(t > 0.15)) continue;
+          const peak = [at(r - 1, s), at(r + 1, s), at(r, s - 1), at(r, s + 1)].every((v) => !(v >= t - 0.04));
+          const sparkle = s % 4 === 0 && t > 0.6 && r === 0;
+          if (!peak && !sparkle) continue;
+          push(s, { midi: nearest(ct, lo + (1 - r / (ROWS - 1)) * (hi - lo)), offset: 0, dur: 1, vel: vel(t) });
+          n++;
+        }
+      }
+      break;
+    case 'pulse':
+      for (let s = 0; s < STEPS; s++) {
+        const t = cols[s].mean;
+        if (Number.isNaN(t)) continue;
+        const ch = chord(s);
+        const ct = tones([s % 2 === 0 ? ch[0] : ch[2] ?? ch[0]]);
+        push(s, { midi: nearest(ct, (lo + hi) / 2), offset: 0, dur: 0.5, vel: vel(t) * dyn(s) });
+      }
+      break;
   }
 
   const wn = norm(win.stats.mean, layer);
@@ -92,14 +178,18 @@ export function buildPattern(win: WindowData, layer: LayerInfo, voice: VoiceMapp
   return {
     steps,
     windowNorm: wn,
-    cutoffHz: Math.min(voice.band[1], 700 * 2 ** (t * 3.5)),
-    pan: Math.max(-1, Math.min(1, voice.pan + (Number.isNaN(g) ? 0 : 0.15 * Math.sin((g * Math.PI) / 180)))),
+    severity: severity(voice, wn),
+    hpHz: span(voice.timbre.hp, t, true),
+    lpHz: span(voice.timbre.lp, t, true),
+    q: span(voice.timbre.q, t),
+    textureDb: voice.texture ? span(voice.texture.db, t) : -Infinity,
+    pan: clamp(voice.pan + (Number.isNaN(g) ? 0 : 0.15 * Math.sin((g * Math.PI) / 180)), -1, 1),
     allNoData: steps.every((x) => x.noData),
   };
 }
 
 /** Stereo position of the scan at step i: west left, east right, around the voice's home. */
-export const scanPan = (home: number, i: number) => Math.max(-1, Math.min(1, home * 0.5 + 0.7 * (i / (STEPS - 1) - 0.5)));
+export const scanPan = (home: number, i: number) => clamp(home * 0.5 + 0.7 * (i / (STEPS - 1) - 0.5), -1, 1);
 
 /** A window holding one constant value, used by the tutorial legend. */
 export function constantWindow(layer: LayerInfo, t: number, n = 6): WindowData {

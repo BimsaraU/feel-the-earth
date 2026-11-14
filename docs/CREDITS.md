@@ -11,6 +11,7 @@ by `scripts/prepare_audio.py`. Geodata is rasterised by `scripts/build_geo.py`.
 | `public/data/geo/grid.bin`, `meta.json`, `countries.geojson` | Natural Earth 1:50m Admin 0 Countries, [ne_50m_admin_0_countries.geojson](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson), https://www.naturalearthdata.com/ | Public domain |
 | `public/data/geo/grid.bin` (sea names) | Natural Earth 1:50m Marine Areas, [ne_50m_geography_marine_polys.geojson](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_geography_marine_polys.geojson) | Public domain |
 | `public/tiles/**` | NASA Earth Observatory (Reto Stöckli, NASA GSFC), Blue Marble "Whole world - land and oceans", [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Whole_world_-_land_and_oceans.jpg) | Public domain (NASA) |
+| `public/data/geo/elevation.bin` | NOAA NCEI ETOPO5 5-minute global relief, https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO5/ | Public domain (US Government) |
 | Layer values (all 8 layers) | **DEMO DATA**, generated in `src/data/fixture.ts`. Not NASA data. | Project code |
 
 ## Software
@@ -132,3 +133,7 @@ recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a deri
 | `public/audio/oneshots/windchime.mp3` | [Windchimes.ogg](https://commons.wikimedia.org/wiki/File:Windchimes.ogg) by Esc861 | Public domain |
 | `public/audio/oneshots/oceanbed.mp3` | [Oceanwavescrushing.ogg](https://commons.wikimedia.org/wiki/File:Oceanwavescrushing.ogg) by Luftrum | CC BY 3.0 |
 | `public/audio/oneshots/landbed.mp3` | [Gentle breeze and birds singing.ogg](https://commons.wikimedia.org/wiki/File:Gentle_breeze_and_birds_singing.ogg) by ezwa | Public domain |
+| `public/audio/oneshots/windbed.mp3` | [Howling wind.ogg](https://commons.wikimedia.org/wiki/File:Howling_wind.ogg) by Tvabutzku1234 | CC0 1.0 |
+| `public/audio/oneshots/rain.mp3` | [Falling Rain SFX 1 2016-11-19.oga](https://commons.wikimedia.org/wiki/File:Falling_Rain_SFX_1_2016-11-19.oga) by valvalion | CC BY 3.0 |
+| `public/audio/oneshots/timpani.mp3` | [VSCO-2-CE Percussion/Timpani/Timpani2_Hit_v3_rr1_Sum.wav](https://raw.githubusercontent.com/sgossner/VSCO-2-CE/master/Percussion/Timpani/Timpani2_Hit_v3_rr1_Sum.wav) | CC0 1.0 |
+| `public/audio/cellotrem/*.mp3` | VSCO-2-CE Strings/Cello Section/trem/* (https://github.com/sgossner/VSCO-2-CE) | CC0 1.0 |

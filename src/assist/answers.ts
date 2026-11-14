@@ -1,6 +1,6 @@
 // Spoken answers built from templates and the mapping table. No LLM.
 
-import { levelWord, norm, type VoiceMapping } from '../audio/mapping';
+import { levelWord, moodWord, norm, severity, type VoiceMapping } from '../audio/mapping';
 import type { LayerInfo } from '../data/types';
 import { compassWord, KM_PER_DEG, type GeoGrid } from '../geo/grid';
 
@@ -45,12 +45,15 @@ export function whereAmI(geo: GeoGrid, lat: number, lon: number, size: number, d
 
 export interface Heard { layer: LayerInfo; voice: VoiceMapping; mean: number }
 
-export function whatAmIHearing(items: Heard[]): string {
+export function whatAmIHearing(items: Heard[], ensembleSeverity = 0): string {
   if (!items.length) return 'No layers are on. You hear a quiet piano pulse. Press 1 to 8 to turn a layer on.';
   const parts = items.map(({ layer, voice, mean }) => {
     if (Number.isNaN(mean)) return `${layer.name}: no data in this window. You hear a soft felt piano pulse instead of ${voice.instrumentSpoken}.`;
     return `${layer.name}, ${spokenNumber(mean)} ${layer.unitSpoken}, ${levelWord(norm(mean, layer))}. You hear it as ${voice.instrumentSpoken}. ${voice.hear}`;
   });
   const demo = items.some((i) => i.layer.demo) ? 'Demo data, not NASA data. ' : '';
-  return `${demo}${parts.join(' ')} The scan runs west to east; higher notes are further north.`;
+  const worst = items.reduce<Heard | null>((a, i) => (!a || severity(i.voice, norm(i.mean, i.layer)) > severity(a.voice, norm(a.mean, a.layer)) ? i : a), null);
+  const mood = moodWord(ensembleSeverity);
+  const moodText = mood === 'calm' ? 'The music is calm.' : `The music is ${mood}, driven by ${worst?.voice.danger.what}.`;
+  return `${demo}${parts.join(' ')} ${moodText} The scan runs west to east; higher notes are further north.`;
 }
