@@ -329,3 +329,9 @@ export function zoomBy(d: number) {
   if (!mapRef) return;
   mapRef.easeTo({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, mapRef.getZoom() + d)), duration: 450 });
 }
+
+/** Back to the whole planet in view. */
+export function resetZoom() {
+  if (!mapRef) return;
+  mapRef.easeTo({ zoom: fitZoom(mapRef.getContainer(), mapRef.getCenter().lat), duration: 600 });
+}

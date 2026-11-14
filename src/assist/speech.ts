@@ -2,6 +2,9 @@ import { engine } from '../audio/engine';
 import { useApp } from '../state';
 
 let flip = false;
+let last = '';
+/** The last thing said, for "repeat". */
+export const lastSaid = () => last;
 
 /** Mirror text to the aria-live region. Alternating a zero-width space makes repeats announce again. */
 export function announce(text: string) {
@@ -11,6 +14,7 @@ export function announce(text: string) {
 
 /** Speak and mirror to the aria-live region. Resolves when speech ends (or right away without TTS). */
 export function say(text: string, interrupt = true): Promise<void> {
+  last = text;
   announce(text);
   const { settings } = useApp.getState();
   const synth = typeof speechSynthesis === 'undefined' || !settings.voice ? null : speechSynthesis;

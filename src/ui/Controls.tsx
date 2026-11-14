@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { engine } from '../audio/engine';
 import { KEYS, levelWord, norm, voiceFor, VOICES } from '../audio/mapping';
 import { placeName, spokenDate, spokenNumber } from '../assist/answers';
+import { canListen, listen, runText } from '../assist/run';
 import { say } from '../assist/speech';
 import { runTutorial, skipNarration, stopTutorial } from '../assist/tutorial';
 import {
@@ -21,34 +22,49 @@ const toDays = (iso: string) => Math.round(Date.parse(iso + 'T00:00:00Z') / DAY)
 const fromDays = (d: number) => new Date(d * DAY).toISOString().slice(0, 10);
 const coord = (v: number, p: string, n: string) => `${Math.abs(v).toFixed(2)}° ${v >= 0 ? p : n}`;
 
-type Recognition = { lang: string; onresult: (e: { results: { 0: { transcript: string } }[] }) => void; start(): void; stop(): void };
-const Rec = (window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition }).SpeechRecognition
-  ?? (window as unknown as { webkitSpeechRecognition?: new () => Recognition }).webkitSpeechRecognition;
-
+/** Hold to speak a command (or Enter / K to start and stop). */
 function PushToTalk() {
-  const rec = useRef<Recognition | null>(null);
   const [on, setOn] = useState(false);
-  if (!Rec) return null;
-  const start = () => {
-    const r = new Rec();
-    r.lang = 'en-GB';
-    r.onresult = (e) => {
-      const text = e.results[0][0].transcript.toLowerCase();
-      if (/peak|valley|high|low|beacon/.test(text)) askBeacons();
-      else if (/where/.test(text)) askWhere();
-      else if (/what|hear|listen/.test(text)) void askWhat();
-      else void say('Sorry, ask "where am I", "what am I hearing" or "find the peak".');
-    };
-    r.start();
-    rec.current = r;
-    setOn(true);
-  };
-  const stop = () => { rec.current?.stop(); setOn(false); };
+  const stop = useRef<() => void>(() => {});
+  if (!canListen) return null;
+  const start = () => { stop.current = listen(setOn); };
   return (
-    <button type="button" aria-pressed={on} onPointerDown={start} onPointerUp={stop} onPointerLeave={() => on && stop()}
-      onKeyDown={(e) => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (on) stop(); else start(); } }}>
-      {on ? 'Listening…' : 'Hold to ask'}
+    <button type="button" aria-pressed={on} onPointerDown={start} onPointerUp={() => stop.current()}
+      onKeyDown={(e) => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (on) stop.current(); else start(); } }}>
+      {on ? 'Listening…' : 'Hold to ask'} <kbd>K</kbd>
     </button>
+  );
+}
+
+/** Example phrases, grouped; tapping one runs it. The full grammar is in assist/commands.ts. */
+const SAY: [string, string[]][] = [
+  ['Move', ['North', 'Far east', 'Go to Brazil', 'Go to the Pacific Ocean']],
+  ['Layers', ['Ocean', 'Lightning', 'Rain', 'Next layer']],
+  ['Time', ['Next day', 'Previous month', 'Next year', 'Time travel']],
+  ['Window and view', ['Wider', 'Narrower', 'Zoom in', 'Reset zoom']],
+  ['Sound', ['Pause', 'Louder', 'Slower', 'Legend']],
+];
+
+function CommandBox() {
+  const [text, setText] = useState('');
+  return (
+    <>
+      <form className="ask" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { runText(text); setText(''); } }}>
+        <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a command, like go to Peru"
+          aria-label="Type a command" enterKeyHint="go" autoComplete="off" />
+        <button type="submit">Run</button>
+      </form>
+      <details className="say">
+        <summary>What you can say</summary>
+        {SAY.map(([group, phrases]) => (
+          <div key={group} className="say-group">
+            <p className="label">{group}</p>
+            <div className="say-chips">{phrases.map((p) => <button key={p} type="button" onClick={() => runText(p)}>{p}</button>)}</div>
+          </div>
+        ))}
+        <button type="button" className="wide" onClick={() => runText('help')}>Read all commands aloud</button>
+      </details>
+    </>
   );
 }
 
@@ -142,6 +158,7 @@ function Assistant() {
       <button type="button" onClick={() => void runTutorial()}>Listening tour <kbd>T</kbd></button>
       <button type="button" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>V</kbd></button>
       <PushToTalk />
+      <CommandBox />
     </div>
   );
 }
@@ -248,13 +265,22 @@ function Counter({ value }: { value: number }) {
   return <span ref={el} />;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Date drum: the year on 1 January, the month on the 1st of every other month, plain day ticks between. */
+const monthTick = (d: number) => {
+  const iso = fromDays(d);
+  if (!iso.endsWith('-01')) return null;
+  const m = +iso.slice(5, 7);
+  return m === 1 ? iso.slice(0, 4) : MONTHS[m - 1];
+};
+
 function Time() {
   const { date, layers, travelling } = useApp();
   const [lo, hi] = dateBounds(layers);
   return (
     <div>
       <Wheel label="Date" value={toDays(date)} min={toDays(lo)} max={toDays(hi)} step={1} pxPerStep={5}
-        format={(d) => spokenDate(fromDays(d))} onChange={(d) => setDate(fromDays(d), 'quiet')} />
+        format={(d) => spokenDate(fromDays(d))} onChange={(d) => setDate(fromDays(d), 'quiet')} tick={monthTick} />
       <div className="buttons row">
         <button type="button" onClick={() => stepDate(0, -12)} aria-label="Back one year">−1 y</button>
         <button type="button" onClick={() => stepDate(0, -1)} aria-label="Back one month">−1 m</button>

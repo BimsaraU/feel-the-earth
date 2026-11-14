@@ -68,6 +68,27 @@ export class GeoGrid {
     return k ? sum / k : 0;
   }
 
+  /**
+   * Centre of a named country or sea (exact name from meta), area-weighted, longitude averaged on the circle.
+   * ponytail: plain centroid, so a ring-shaped or split country can land outside itself; fine for "go to" voice jumps.
+   */
+  centreOf(name: string): { lat: number; lon: number } | null {
+    const { res, width, height, countries, seas } = this.meta;
+    const ci = countries.indexOf(name) + 1, si = ci ? 0 : seas.indexOf(name) + 1;
+    if (!ci && !si) return null;
+    let w = 0, la = 0, x = 0, y = 0;
+    for (let r = 0; r < height; r++) {
+      const lat = 90 - (r + 0.5) * res, cw = Math.cos(lat * D2R);
+      for (let c = 0; c < width; c++) {
+        const i = r * width + c;
+        if (ci ? this.country[i] !== ci : this.country[i] !== 0 || this.sea[i] !== si) continue;
+        const lon = (-180 + (c + 0.5) * res) * D2R;
+        w += cw; la += lat * cw; x += Math.cos(lon) * cw; y += Math.sin(lon) * cw;
+      }
+    }
+    return w ? { lat: la / w, lon: Math.atan2(y, x) / D2R } : null;
+  }
+
   /** Ring search outwards for the nearest cell whose land state differs. Called on demand, not per frame. */
   nearestCoast(lat: number, lon: number, maxKm = 3000): { km: number; bearingDeg: number } | null {
     const { res } = this.meta;

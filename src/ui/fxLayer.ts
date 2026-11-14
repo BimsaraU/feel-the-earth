@@ -262,6 +262,7 @@ export function createFx(map: MlMap, host: HTMLElement) {
     rings = rings.filter((r) => now - r.t0 < r.life);
     for (const r of rings) {
       const k = (now - r.t0) / r.life;
+      if (k < 0) continue; // scheduled for a later audio beat
       const q = proj(r.lat, r.lon);
       ctx.strokeStyle = `rgba(${r.rgb},${(1 - k) ** 2})`;
       ctx.lineWidth = r.w * (1 - k) + 0.5;

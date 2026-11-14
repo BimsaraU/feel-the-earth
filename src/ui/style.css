@@ -170,33 +170,43 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 .reading .level { margin-left: auto; font: 500 0.76rem var(--sans); color: var(--mint); }
 .reading canvas { width: 100%; height: 30px; margin-top: 4px; display: block; }
 
-/* ---- tactile dial: a knurled metal drum that turns under the finger, clicks at every step, thuds at the end stops ---- */
-.wheel-field { margin: 10px 0 12px; }
+/* ---- scroll wheel: a dark drum printed with its own scale, lit along its crown, rolling under a fixed mint pointer ---- */
+.wheel-field { margin: 10px 0 14px; }
 .wheel-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 300; font-size: 0.86rem; }
 .wheel-head output { color: var(--mint); font-variant-numeric: tabular-nums; text-align: right; }
 .wheel {
-  position: relative; height: 52px; margin-top: 5px; border-radius: 14px; cursor: grab; touch-action: none; overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  /* each ridge: a lit edge next to a dark groove; the pattern slides with the value */
-  background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.8) 0 1px, rgba(0, 0, 0, 0.7) 1px 3px, transparent 3px var(--pitch)),
-    linear-gradient(#4a5175, #262a44 55%, #15182b);
-  background-size: var(--pitch) 100%, 100% 100%;
-  background-repeat: repeat-x, no-repeat;
-  background-position: calc(50% + var(--offset) + var(--pitch) / 2) 0, 0 0;
-  box-shadow: inset 0 9px 10px -7px rgba(255, 255, 255, 0.28), inset 0 -12px 12px -7px rgba(0, 0, 0, 0.85), 0 8px 16px -10px #000;
-  transition: filter 0.15s, box-shadow 0.15s;
+  position: relative; height: 60px; margin-top: 6px; border-radius: 14px; cursor: grab; touch-action: none; overflow: hidden; user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(#1b1f38, #2c3254 46%, #232844 54%, #0e1124);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -10px 14px -8px rgba(0, 0, 0, 0.9), 0 10px 20px -14px #000;
+  transition: box-shadow 0.15s;
 }
-.wheel:hover { filter: brightness(1.12); }
-.wheel:active { cursor: grabbing; filter: brightness(1.25); box-shadow: inset 0 9px 10px -7px rgba(255, 255, 255, 0.28), inset 0 -12px 12px -7px rgba(0, 0, 0, 0.85), 0 0 0 2px var(--mint-soft); }
+.wheel:active { cursor: grabbing; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -10px 14px -8px rgba(0, 0, 0, 0.9), 0 0 0 2px var(--mint-soft); }
+.wheel-scale { position: absolute; inset: 0; }
+/* each tick sits at the centre and is moved out along the drum (translateX) and foreshortened (scaleX) from JS */
+.wheel-tick { position: absolute; left: 50%; bottom: 8px; width: 1px; height: 9px; margin-left: -0.5px; background: rgba(238, 241, 251, 0.55); transform-origin: center; }
+.wheel-tick.major { height: 16px; background: var(--ink); }
+.wheel-tick b { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font: 500 0.72rem var(--sans); font-variant-numeric: tabular-nums; color: var(--ink); }
 /* the drum curves away at both ends */
 .wheel-shade { position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg, rgba(3, 4, 11, 0.9), rgba(3, 4, 11, 0.3) 14%, transparent 32%, rgba(255, 255, 255, 0.1) 50%, transparent 68%, rgba(3, 4, 11, 0.3) 86%, rgba(3, 4, 11, 0.9)); }
+  background: linear-gradient(90deg, rgba(3, 4, 11, 0.95), rgba(3, 4, 11, 0.35) 16%, transparent 34%, rgba(255, 255, 255, 0.06) 50%, transparent 66%, rgba(3, 4, 11, 0.35) 84%, rgba(3, 4, 11, 0.95)); }
 /* fixed pointer: a notch above and below the drum */
 .wheel-mark { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--mint); box-shadow: 0 0 10px var(--mint); }
 .wheel-mark::before, .wheel-mark::after { content: ''; position: absolute; left: -5px; border: 6px solid transparent; }
 .wheel-mark::before { top: 0; border-top-color: var(--mint); }
 .wheel-mark::after { bottom: 0; border-bottom-color: var(--mint); }
+
+/* ---- assistant: typed commands and the phrase list ---- */
+.ask { display: flex; gap: 6px; margin-top: 6px; }
+.ask input { flex: 1; min-width: 0; min-height: 48px; padding: 0 12px; font: 400 0.9rem var(--sans); color: var(--ink);
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 14px; }
+.ask input::placeholder { color: var(--faint); }
+.say summary { cursor: pointer; padding: 10px 4px; color: var(--muted); font-size: 0.86rem; }
+.say-group { margin: 4px 0 8px; }
+.say-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.say-chips button { min-height: 36px; padding: 2px 10px; font-size: 0.8rem; border-radius: 999px; }
+.assistant { max-height: calc(100vh - 2 * var(--gap) - 90px); overflow-y: auto; }
 
 .field { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; font-weight: 300; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 48px; font-weight: 300; }
