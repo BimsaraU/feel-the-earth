@@ -1,4 +1,4 @@
-﻿import { expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('load, unlock audio, move, toggle a layer, ask both questions, time travel', async ({ page }) => {
   const errors: string[] = [];
@@ -7,7 +7,7 @@ test('load, unlock audio, move, toggle a layer, ask both questions, time travel'
   await page.goto('/');
   await page.getByRole('button', { name: /press any key to begin/i }).click();
   const caption = page.locator('.caption');
-  await expect(caption).toContainText('Feel the Earth.', { timeout: 30_000 });
+  await expect(caption).toContainText('Welcome to Feel the Earth', { timeout: 30_000 });
   await expect(caption).not.toContainText('DEMO DATA'); // real NASA EIC layers loaded
 
   await page.keyboard.press('ArrowRight'); // quarter of 10 degrees east
@@ -33,10 +33,10 @@ test('load, unlock audio, move, toggle a layer, ask both questions, time travel'
 
   await page.keyboard.press('KeyT');
   const tour = page.getByRole('region', { name: 'Listening tour' });
-  await expect(tour).toContainText('1 of 18');
-  await expect(caption).toContainText('Welcome to the listening tour.');
+  await expect(tour).toContainText('1 of 19');
+  await expect(caption).toContainText('Welcome to the listening tour!');
   await page.getByRole('button', { name: 'Skip' }).click();
-  await expect(tour).toContainText('2 of 18', { timeout: 10_000 });
+  await expect(tour).toContainText('2 of 19', { timeout: 10_000 });
   await page.keyboard.press('Escape');
   await expect(tour).toHaveCount(0);
 

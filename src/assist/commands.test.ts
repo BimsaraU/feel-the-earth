@@ -26,6 +26,8 @@ describe('assistant commands', () => {
     ['find the peak', { kind: 'beacons', which: 'peak' }],
     ['where is the lowest valley', { kind: 'beacons', which: 'valley' }],
     ['peak and valley', { kind: 'beacons', which: 'both' }],
+    ['help', { kind: 'tour', which: 'assistant' }],
+    ['start the tutorial', { kind: 'tour', which: 'listening' }],
     ['time travel off', { kind: 'travel', on: false }],
     ['louder', { kind: 'volume', step: 1 }],
     ['explorer', { kind: 'explore', on: true }],

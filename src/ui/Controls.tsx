@@ -163,6 +163,7 @@ function Assistant() {
       <button type="button" onClick={() => askBeacons('peak')}>Find the peak <kbd>B</kbd></button>
       <button type="button" onClick={() => askBeacons('valley')}>Find the valley <kbd>V</kbd></button>
       <button type="button" onClick={() => void runTutorial()}>Listening tour <kbd>T</kbd></button>
+      <button type="button" onClick={() => void runTutorial('assistant')}>How to talk to JODI <kbd>Shift T</kbd></button>
       <button type="button" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>tap J</kbd></button>
       <PushToTalk />
       <CommandBox />

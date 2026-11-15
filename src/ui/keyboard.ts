@@ -35,7 +35,7 @@ export function onKey(e: KeyboardEvent) {
   else if (e.code === 'KeyJ') { if (!e.repeat) jodiDown(); }
   else if (e.code === 'KeyA') window.dispatchEvent(new Event('fte-assistant'));
   else if (e.code === 'KeyK') toggleListening();
-  else if (e.code === 'KeyT') void runTutorial();
+  else if (e.code === 'KeyT') void runTutorial(e.shiftKey ? 'assistant' : 'listening');
   else if (e.code === 'KeyY') setTravelling(!useApp.getState().travelling);
   else if (e.code === 'KeyM') window.dispatchEvent(new Event('fte-menu'));
   else if (e.code === 'KeyG') {

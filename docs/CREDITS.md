@@ -108,5 +108,5 @@ recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a deri
 
 ## Narration
 
-Listening-tour voice (public/audio/narration): generated locally with Kokoro-82M (hexgrad, Apache-2.0), voice `af_heart`,
-via kokoro-onnx (MIT). Script: src/assist/narration.json; build: scripts/build_narration.py.
+Welcome and tour voice (public/audio/narration) and JODI's live speech: generated with Fish Audio (fish.audio), public voice
+model "Harriet's London Voice". Script: src/assist/narration.json; build: scripts/build_narration.mjs.

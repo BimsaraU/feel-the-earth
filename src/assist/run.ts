@@ -78,7 +78,7 @@ export function runCommand(c: Command, heard = '') {
     case 'where': askWhere(); break;
     case 'what': void askWhat(); break;
     case 'beacons': askBeacons(c.which); break;
-    case 'tour': void runTutorial(); break;
+    case 'tour': void runTutorial(c.which); break;
     case 'travel': setTravelling(c.on); break;
     case 'repeat': void say(lastSaid() || 'Nothing to repeat yet.'); break;
     case 'help': void say(HELP_TEXT); break;

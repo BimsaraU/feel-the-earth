@@ -20,7 +20,7 @@ npm run mapping    # regenerate docs/MAPPING.md from src/audio/mapping.ts
 ```
 
 Assets are committed. To rebuild them (needs network):
-`python scripts/prepare_audio.py`, `python scripts/build_narration.py` (Kokoro neural voice for the tour), `python scripts/build_geo.py`, `python scripts/build_imagery.py` and `python scripts/build_elevation.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
+`python scripts/prepare_audio.py`, `node scripts/build_narration.mjs` (JODI's Fish Audio voice for the welcome and tours; needs the Fish key), `python scripts/build_geo.py`, `python scripts/build_imagery.py` and `python scripts/build_elevation.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
 
 ## Keys
 
@@ -34,7 +34,7 @@ Assets are committed. To rebuild them (needs network):
 | B / V | Find the peak / the valley: where the highest / lowest value nearby is (its beacon pings) |
 | A | Audio assistant panel |
 | G | Arrows turn the globe instead |
-| T | Listening tour: narrated guide to every sound and why it sounds that way (Esc ends it) |
+| T / Shift+T | Listening tour (every sound and why it sounds that way) / assistant tour (how to talk to JODI). Esc ends either |
 | J (hold) | Talk to JODI, the voice assistant (or say "Hey Jodi"). A quick tap turns the voice guide on / off |
 | Y | Time travel on / off (one step per bar) |
 | M | Menu (sidebar) |

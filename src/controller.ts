@@ -6,6 +6,7 @@ import { moodOf } from './audio/harmony';
 import { denorm, norm, severity, voiceFor } from './audio/mapping';
 import { placeName, spokenDate, spokenNumber, whatAmIHearing, whereAmI } from './assist/answers';
 import { announce, say } from './assist/speech';
+import { welcome } from './assist/tutorial';
 import { frameDate, source } from './data';
 import { normLon } from './data/fixture';
 import type { BBox, LayerId } from './data/types';
@@ -64,9 +65,7 @@ async function boot() {
   engine.startLoop();
   st().set({ playing: true });
   const demo = layers.some((l) => l.demo) ? 'This build plays DEMO DATA, not NASA data. ' : '';
-  void say(`${demo}Feel the Earth. You are listening to ${placeName(g, st().lat, st().lon)}. ` +
-    'Arrow keys move the listening window. Plus and minus change its size. Numbers 1 to 9 switch layers. ' +
-    'W: where am I. H: what am I hearing. Comma and full stop step through days. T takes the listening tour. B finds peaks, V valleys. Hold J, or say hey Jodi, to ask me anything; tap J to turn this voice off.');
+  void welcome(placeName(g, st().lat, st().lon), demo);
 }
 
 function applySettings(keyChanged = false) {

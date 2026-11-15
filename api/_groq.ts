@@ -54,10 +54,10 @@ export async function chat(req: Request): Promise<Response> {
   return json({ answer: data.choices?.[0]?.message?.content?.trim() ?? '' });
 }
 
-/** Fish Audio voice for JODI: public model "Sweet Young Singer" (young, soft, breathy, warm, gentle). Override with
- *  FISH_VOICE (alternatives tried: d8f3b4c1199f4568a767ec54112d2b17 anime-style playful,
- *  f7f74a4bc4324c25b96b9b6741a72ab3 sweet and soft, 3b3698528082474791f9dd22f024fd3c relaxed). */
-const FISH_VOICE = '5109f9634e6d45d5a870a2fc29950ef4';
+/** Fish Audio voice for JODI: public model "Harriet's London Voice" (young, warm, friendly, London accent). Keep in
+ *  step with scripts/build_narration.mjs. Override with FISH_VOICE (also tried: 5109f9634e6d45d5a870a2fc29950ef4 sweet
+ *  young singer, d8f3b4c1199f4568a767ec54112d2b17 anime-style, bb70d020889b403bb9ef6c9fa3ffb0cc London gurl). */
+const FISH_VOICE = 'd38a3e358fc74bf6bf78aa3351add681';
 const fishKey = () => env('FISH_AUDIO_API_KEY') ?? env('FAUDIO');
 
 /** POST { text } (max 200 characters) -> audio. Fish Audio when its key is set (Groq's TTS rate limit is tiny),

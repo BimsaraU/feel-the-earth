@@ -55,6 +55,8 @@ function neural(text: string): Promise<Tone.ToneAudioBuffer> {
 const timeout = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<never>((_, no) => setTimeout(() => no(new Error('slow')), ms))]);
 
 let gen = 0;
+/** Bumps whenever speech is interrupted; long narrations check it to know they were cut short. */
+export const speechGen = () => gen;
 let queue: Promise<void> = Promise.resolve();
 
 /** Speak and mirror to the aria-live region. Resolves when speech ends (or right away without a voice). */
