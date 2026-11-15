@@ -1,12 +1,14 @@
 import * as Tone from 'tone';
 import { VOICES, voiceFor } from '../audio/mapping';
 import {
-  askBeacons, askWhat, askWhere, geo, moveBy, resize, setCenter, setSize, setTravelling, showLayer, stepDate, togglePlay, toggleVoice,
+  askBeacons, askWhat, askWhere, dateBounds, geo, moveBy, resize, setCenter, setDate, setSize, setTravelling, showLayer, stepDate, toggleLayer, togglePlay, toggleVoice,
 } from '../controller';
 import { MAX_SIZE, MIN_SIZE, useApp } from '../state';
 import { resetZoom, zoomBy } from '../ui/Globe';
 import { HELP_TEXT, matchPlace, parseAlternatives, WAKE, type Command } from './commands';
-import { announce, converse, lastSaid, say, stopSpeech } from './speech';
+import { announce, capture, converse, lastSaid, say, stopSpeech, type ChatMsg } from './speech';
+import type { LayerId } from '../data/types';
+import { LAYER_IDS } from './tools';
 import { engine } from '../audio/engine';
 import { placeName, spokenDate, spokenNumber } from './answers';
 import { runTutorial } from './tutorial';
@@ -38,7 +40,7 @@ export function runCommand(c: Command, heard = '') {
       if (!geo) { void say('The map is still loading.'); break; }
       const name = matchPlace(c.place, [...geo.meta.countries, ...geo.meta.seas]);
       const at = name ? geo.centreOf(name) : null;
-      if (!name || !at) { void say(`I could not find ${c.place}.`); break; }
+      if (!name || !at) { void ask(heard || `go to ${c.place}`); break; } // a city, reef or mountain: the assistant knows where
       void say(`Going to ${name}.`);
       setCenter(at.lat, at.lon, true);
       break;
@@ -94,32 +96,148 @@ function context(): string {
     const l = s.layers.find((x) => x.id === id);
     const m = s.means[id];
     const f = s.frames[id];
-    return l ? `${l.name} (${voiceFor(id).instrumentSpoken}): ${m === undefined || Number.isNaN(m) ? 'no data here' : `${spokenNumber(m)} ${l.unitSpoken}`}`
-      + `, scale ${l.min} to ${l.max}${f && f !== s.date ? `, nearest record ${spokenDate(f)}` : ''}. Source: ${l.sourceText}` : id;
+    return l ? `${l.name} [${id}] (${voiceFor(id).instrumentSpoken}): ${m === undefined ? 'not read yet' : Number.isNaN(m) ? 'no data here' : `${spokenNumber(m)} ${l.unitSpoken}`}`
+      + `, scale ${l.min} to ${l.max}${f && f !== s.date ? `, nearest record ${spokenDate(f)}` : ''}${id === s.active[s.active.length - 1] ? `. Source: ${l.sourceText}` : ''}` : id;
   });
   return [
     `Place: ${geo ? placeName(geo, s.lat, s.lon) : 'unknown'} (${s.lat.toFixed(1)}, ${s.lon.toFixed(1)}), window ${Math.round(s.size)} degrees wide.`,
-    `Date: ${spokenDate(s.date)}. Music ${s.playing ? 'playing' : 'paused'}.`,
+    `Date: ${spokenDate(s.date)} (${s.date}); data from ${dateBounds()[0]} to ${dateBounds()[1]}. Music ${s.playing ? 'playing' : 'paused'}${s.travelling ? ', time travelling' : ''}. Volume ${Math.round(s.settings.masterVolume * 100)} percent, tempo ${Math.round(Tone.getTransport().bpm.value)}. The mapped layer is the last one playing.`,
     `Layers playing: ${layers.join(' | ') || 'none'}.`,
-    `Other layers: ${s.layers.filter((l) => !s.active.includes(l.id)).map((l) => l.name).join(', ')}.`,
+    `Other layers: ${s.layers.filter((l) => !s.active.includes(l.id)).map((l) => `${l.name} [${l.id}]`).join(', ')}.`,
     'Higher values play higher notes; the scan line sweeps the window west to east once per loop; danger adds a tremolo drone and heartbeat.',
   ].join(' ');
 }
 
-/** Not a command: a question for the conversational assistant (Groq), with the plain fallback when offline. */
-async function ask(heard: string) {
-  if (!heard) { void say('Say help for the commands.'); return; }
-  announce('Thinking…');
-  st().set({ jodi: 'thinking' });
-  const answer = await converse(heard, context());
-  if (st().jodi === 'thinking') st().set({ jodi: 'idle' });
-  void say(answer ?? `Sorry, I did not catch "${heard}". Say help for the commands.`);
+// ---------- the agent: JODI (Qwen on Groq) answers and acts through the tools in tools.ts ----------
+
+/** What the window values depend on. */
+const where = () => { const s = st(); return `${s.lat},${s.lon},${s.size},${s.date},${s.active.join()}`; };
+/** Resolves when the window values next update (after a move), or after 2 s. */
+const freshValues = () => new Promise<void>((resolve) => {
+  const done = () => { clearTimeout(t); un(); resolve(); };
+  const t = setTimeout(done, 2000), un = useApp.subscribe((s, p) => { if (s.means !== p.means) done(); });
+});
+
+/** Recent turns (listener and JODI's spoken replies), so follow-ups like "and further east?" make sense. */
+let history: ChatMsg[] = [];
+let turn = 0;
+
+const num = (v: unknown, lo: number, hi: number, d: number) => Math.min(hi, Math.max(lo, Number.isFinite(Number(v)) && v !== null ? Number(v) : d));
+const here = () => (geo ? placeName(geo, st().lat, st().lon) : 'unknown');
+
+/** Run one tool call; resolves to what happened, for the model. `after` collects actions to run once JODI has replied. */
+async function runTool(name: string, a: Record<string, unknown>, after: (() => void)[]): Promise<string> {
+  const s = st();
+  switch (name) {
+    case 'set_playing': if (!!a.playing !== s.playing) togglePlay(); return a.playing ? 'Playing.' : 'Paused.';
+    case 'layer': {
+      const id = a.layer as LayerId;
+      if (!LAYER_IDS.includes(id) || !s.layers.some((l) => l.id === id)) return `No layer ${String(a.layer)}.`;
+      const on = s.active.includes(id);
+      if (a.on === false) { if (on) toggleLayer(id); return on ? `${id} off.` : `${id} was already off.`; }
+      if (!on) toggleLayer(id);
+      showLayer(id);
+      return st().active.includes(id) ? `${id} on and on the map.` : 'Four layers is the maximum; turn one off first.';
+    }
+    case 'go_to_place': {
+      if (!geo) return 'The map is still loading.';
+      const place = String(a.place ?? ''), name = matchPlace(place, [...geo.meta.countries, ...geo.meta.seas]), at = name ? geo.centreOf(name) : null;
+      if (!name || !at) return `${place} is not a country or sea I know; use set_location with its coordinates.`;
+      setCenter(at.lat, at.lon, true);
+      return `Now over ${name} (${at.lat.toFixed(1)}, ${at.lon.toFixed(1)}).`;
+    }
+    case 'set_location': {
+      setCenter(num(a.lat, -85, 85, s.lat), num(a.lon, -180, 180, s.lon), true);
+      return `Now at ${st().lat.toFixed(1)}, ${st().lon.toFixed(1)}, over ${here()}.`;
+    }
+    case 'move': {
+      const d = s.size * num(a.steps, 1, 20, 1);
+      const [dLat, dLon] = ({ north: [d, 0], south: [-d, 0], east: [0, d], west: [0, -d] } as Record<string, number[]>)[String(a.direction)] ?? [0, 0];
+      moveBy(dLat, dLon);
+      return `Moved ${String(a.direction)}; now over ${here()}.`;
+    }
+    case 'set_window_size': { const d = Math.round(num(a.degrees, MIN_SIZE, MAX_SIZE, s.size)); setSize(d, true); return `Window ${d} degrees.`; }
+    case 'set_date': {
+      const d = String(a.date ?? '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d))) return 'Use a real date as YYYY-MM-DD.';
+      setDate(d);
+      return `Date is ${spokenDate(st().date)}.`;
+    }
+    case 'step_date': {
+      const n = Math.round(num(a.steps, -50, 50, 1));
+      if (a.unit === 'year') stepDate(0, 12 * n); else if (a.unit === 'month') stepDate(0, n); else stepDate(n);
+      return `Date is ${spokenDate(st().date)}.`;
+    }
+    case 'time_travel': setTravelling(!!a.on); return `Time travel ${a.on ? 'on' : 'off'}.`;
+    case 'zoom': if (a.action === 'reset') resetZoom(); else zoomBy(a.action === 'out' ? -1 : 1); return 'Zoomed.';
+    case 'set_volume': { const v = Math.round(num(a.percent, 0, 100, 70)); s.setSettings({ masterVolume: v / 100 }); return `Volume ${v} percent.`; }
+    case 'set_tempo': { const b = Math.round(num(a.bpm, 40, 120, BPM)); Tone.getTransport().bpm.rampTo(b, 0.5); return `Tempo ${b} beats a minute.`; }
+    case 'where_am_i': askWhere(); return '';
+    case 'what_am_i_hearing': await askWhat(); return '';
+    case 'find_extremes': askBeacons((a.which === 'peak' || a.which === 'valley' ? a.which : 'both')); return '';
+    case 'start_tour': after.push(() => void runTutorial(a.which === 'assistant' ? 'assistant' : 'listening')); return 'The tour starts after your reply.';
+    default: return `No tool ${name}.`;
+  }
 }
 
-/** A typed or spoken phrase, end to end. */
-export function runText(text: string) {
-  const { command, heard } = parseAlternatives([text]);
-  runCommand(command, heard);
+/** JODI answers, acting through tools (a few rounds at most). Resolves false when the assistant is unavailable
+ *  (offline, no key) and did nothing, so the caller can fall back to the keyword command. */
+async function agent(heard: string): Promise<boolean> {
+  const my = ++turn;
+  announce('Thinking…');
+  st().set({ jodi: 'thinking' });
+  const msgs: ChatMsg[] = [...history, { role: 'user', content: heard }];
+  const after: (() => void)[] = [];
+  let reply: string | null = null, acted = false;
+  const did: string[] = [];
+  for (let round = 0; round < 5 && reply === null; round++) {
+    const m = await converse(msgs, context());
+    if (my !== turn) return true; // a newer request took over
+    if (!m) break;
+    msgs.push(m);
+    if (!m.tool_calls?.length) { reply = m.content ?? ''; break; }
+    const before = where();
+    for (const c of m.tool_calls) {
+      let args: Record<string, unknown> = {};
+      try { args = JSON.parse(c.function.arguments || '{}'); } catch { /* bad JSON: the tool falls back to defaults */ }
+      // What the action would have said (e.g. "No data before 2007") goes to the model, not the speaker.
+      let res = '';
+      const spoken = await capture(async () => { res = await runTool(c.function.name, args, after); });
+      const content = [res, spoken].filter(Boolean).join(' ') || 'Done.';
+      msgs.push({ role: 'tool', tool_call_id: c.id, content });
+      did.push(content);
+      acted = true;
+    }
+    if (where() !== before) await freshValues(); // the next step should read the new place's values, not the old ones
+  }
+  if (my !== turn) return true;
+  if (st().jodi === 'thinking') st().set({ jodi: 'idle' });
+  if (reply === null && !acted) return false;
+  const text = reply || did.slice(-2).join(' ') || 'Done.';
+  history = [...history, { role: 'user' as const, content: heard }, { role: 'assistant' as const, content: text }].slice(-8);
+  await say(text);
+  after.forEach((f) => f());
+  return true;
+}
+
+/** Not a plain command: a question or request for the assistant, with a fallback when it is unavailable. */
+async function ask(heard: string, fallback?: Command) {
+  if (!heard) { void say('Say help for the commands.'); return; }
+  if (await agent(heard)) return;
+  if (fallback) runCommand(fallback);
+  else void say(`Sorry, I could not do "${heard}" without the internet. Say help for the commands.`);
+}
+
+/** Long or compound requests ("go to Peru and play the ocean") go to the agent first; short ones stay instant and offline. */
+export const forAgent = (heard: string) => heard.trim().split(/\s+/).length >= 6 || /\b(and|then|also|after that)\b/i.test(heard);
+
+/** A typed or spoken phrase (or the recognizer's alternatives), end to end. */
+export function runText(text: string | string[]) {
+  const alts = Array.isArray(text) ? text : [text];
+  const { command, heard } = parseAlternatives(alts);
+  const said = heard || alts[0] || '';
+  if (command.kind !== 'unknown' && forAgent(said)) void ask(said, command);
+  else runCommand(command, said);
 }
 
 // ---------- JODI listens: hold J (or K / the Hold button) for one request, or "Hey Jodi" in the background ----------
@@ -162,10 +280,7 @@ export function listen(onState: (on: boolean) => void = () => {}, hold = false):
     if (rec === r) rec = null;
     onState(false);
     if (st().jodi === 'listening') st().set({ jodi: 'idle' });
-    if (!cancelled && alts.length) {
-      const { command, heard } = parseAlternatives(alts);
-      runCommand(command, heard);
-    }
+    if (!cancelled && alts.length) runText(alts);
     setTimeout(resumeWake, 300);
   };
   r.start();

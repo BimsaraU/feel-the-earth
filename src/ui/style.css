@@ -43,7 +43,7 @@ button, select {
   border: 1px solid var(--line); border-radius: 14px; padding: 6px 12px; min-height: 48px; min-width: 48px; cursor: pointer;
   transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.08s;
 }
-button:hover { background: var(--accent-soft); border-color: rgba(255, 159, 69, 0.4); }
+@media (hover: hover) { button:hover { background: var(--accent-soft); border-color: rgba(255, 159, 69, 0.4); } } /* no sticky hover after a tap */
 button:active { transform: translateY(1px) scale(0.985); }
 button[aria-pressed='true'], button[aria-expanded='true'] { background: var(--accent-soft); border-color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -87,10 +87,11 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
 @keyframes pulse { 50% { opacity: 0.4; } }
 
 /* ---- layout: the planet in the middle, place top left, three buttons top right, map key bottom left ---- */
-.app { position: relative; height: 100%; }
+.app { position: relative; height: 100%; overflow: hidden; } /* the parked menu (off to the right) must not widen the page */
 .globe { position: absolute; inset: 0; z-index: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
 .globe:focus-visible { outline-offset: -4px; }
-.hud { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+/* Inside the notch, rounded corners and home indicator (viewport-fit=cover in index.html). */
+.hud { position: absolute; inset: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0); pointer-events: none; z-index: 2; }
 .hud > * { pointer-events: auto; }
 
 .brand { position: absolute; top: var(--gap); left: calc(var(--gap) + 4px); max-width: min(46ch, 58vw); pointer-events: none; text-shadow: 0 1px 18px #000; isolation: isolate; }
@@ -118,7 +119,7 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
   background: conic-gradient(var(--accent) calc(var(--phase, 0) * 360deg), rgba(255, 159, 69, 0.14) 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); }
-.transport:hover { background: #fff; box-shadow: 0 0 28px rgba(255, 159, 69, 0.35); }
+@media (hover: hover) { .transport:hover { background: #fff; box-shadow: 0 0 28px rgba(255, 159, 69, 0.35); } }
 
 .panel-title { font: 340 1.25rem/1.2 var(--serif); font-variation-settings: 'opsz' 48, 'SOFT' 100; padding: 2px 4px 6px; }
 .assistant {
@@ -228,7 +229,11 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
 .say-group { margin: 4px 0 8px; }
 .say-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .say-chips button { min-height: 36px; padding: 2px 10px; font-size: 0.8rem; border-radius: 999px; }
-.assistant { max-height: calc(100vh - 2 * var(--gap) - 90px); overflow-y: auto; }
+.assistant { max-height: calc(100dvh - 2 * var(--gap) - 90px); overflow-y: auto; overscroll-behavior: contain; }
+.sidebar { overscroll-behavior: contain; }
+/* 16 px or more: iOS zooms the page into any smaller text field on focus. */
+@media (pointer: coarse) { .ask input { font-size: 16px; } kbd { display: none; } } /* no keyboard hints on touch screens */
+.hold { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 
 .field { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; font-weight: 300; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 48px; font-weight: 300; }
@@ -241,8 +246,9 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
 .resize-handle { width: 48px; height: 48px; display: grid; place-items: center; cursor: nwse-resize; touch-action: none; }
 .resize-handle::before { content: ''; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #fff8f1; background: rgba(255, 159, 69, 0.35); box-shadow: 0 0 16px var(--accent); }
 
-@media (max-width: 860px) {
+@media (max-width: 860px) and (min-height: 501px) {
   :root { --gap: 12px; }
+  .assistant { left: var(--gap); width: auto; }
   .brand { right: var(--gap); max-width: none; top: calc(var(--gap) + 84px); }
   .brand h1 { font-size: 2rem; }
   .coords { gap: 4px 16px; margin-top: 10px; }
@@ -253,7 +259,36 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
   .mapkey { width: auto; right: var(--gap); padding: 10px 12px; }
   .mapkey-marks { display: none; }
   .home-time { bottom: calc(var(--gap) + 136px); } /* above the full-width map key */
-  .sidebar { top: auto; right: 0; left: 0; bottom: 0; width: 100%; max-height: 62vh; border-radius: 20px 20px 0 0; z-index: 4; }
+  .sidebar { top: auto; right: 0; left: 0; bottom: 0; width: 100%; max-height: 62dvh; border-radius: 20px 20px 0 0; z-index: 4;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0)); }
+}
+
+/* Phones on their side: little height, so the panels shrink to the corners and leave the planet in the middle. */
+@media (max-height: 500px) {
+  :root { --gap: 10px; }
+  .brand { max-width: min(34ch, 40vw); }
+  .brand::before { inset: -40px -60px -40px -40px; }
+  .wordmark { font-size: 0.8rem; }
+  .brand h1 { font-size: 1.6rem; margin-top: 2px; }
+  .coords { gap: 2px 12px; margin-top: 6px; }
+  .coords dt { display: none; }
+  .coords dd { font-size: 0.78rem; }
+  .caption { font-size: 0.78rem; margin-top: 6px; -webkit-line-clamp: 2; }
+  .bar { padding: 4px 4px 4px 8px; }
+  .bar kbd { display: none; }
+  .bar button:not(.transport) { min-height: 44px; padding: 4px 12px; }
+  .transport { width: 44px; height: 44px; min-width: 44px; margin-right: 6px; }
+  .assistant, .sidebar { top: calc(var(--gap) + 62px); }
+  .assistant { max-height: calc(100dvh - 2 * var(--gap) - 62px); width: min(300px, 44vw); }
+  .sidebar { width: min(340px, 46vw); }
+  .mapkey { width: min(240px, 34vw); padding: 8px 12px; }
+  .mapkey-name { font-size: 1rem; margin: 0 0 6px; }
+  .mapkey .small, .mapkey-marks, .mapkey-heard { display: none; }
+  .home-time { left: auto; right: var(--gap); transform: none; }
+  .home-time.open { width: min(420px, 55vw); }
+  .tour { width: min(460px, 60vw); padding: 10px 14px 8px; }
+  .tour-title { font-size: 1.15rem; }
+  .tour-text { font-size: 0.8rem; -webkit-line-clamp: 3; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) {

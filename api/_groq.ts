@@ -2,10 +2,16 @@
 // Used by the Vercel functions in this folder and by the dev server (vite.config.ts).
 // Keys: GROQ_API_KEY (or GROQ) and FISH_AUDIO_API_KEY (or FAUDIO); on Vercel, Project Settings > Environment Variables.
 
+import { TOOLS } from '../src/assist/tools';
 import { DEFAULT_VOICE, VOICES_TTS } from '../src/assist/voices';
 
 const BASE = 'https://api.groq.com/openai/v1';
-const CHAT_MODEL = 'openai/gpt-oss-120b';
+/** Qwen on Groq: fast tool calling (~0.4 s a step). When its rate limit is hit (the free tier allows ~8,000 tokens a
+ *  minute per model) the next model takes over; each model has its own allowance. */
+const CHAT_MODELS: Record<string, object> = {
+  'qwen/qwen3.8-27b': { reasoning_effort: 'none', reasoning_format: 'hidden' },
+  'openai/gpt-oss-120b': { reasoning_effort: 'low', include_reasoning: false },
+};
 const TTS_MODEL = 'canopylabs/orpheus-v1-english';
 /** Orpheus English voices: autumn, diana, hannah, austin, daniel, troy. */
 const VOICE = 'hannah';
@@ -14,11 +20,13 @@ const env = (k: string) => (globalThis as { process?: { env: Record<string, stri
 const key = () => env('GROQ_API_KEY') ?? env('GROQ');
 
 const SYSTEM = (name: string) => `You are ${name}, the friendly voice guide of Feel the Earth (you are a little Earth with a headband), an app that turns NASA Earth data into music for blind and sighted
-listeners. You speak, you are not read: answer in one to three short, warm, gently playful sentences, like a curious, knowledgeable friend
-beside them. No lists, no markdown, no emoji, no URLs. Spell out units ("degrees Celsius"). Use the app context you are
-given (place, date, layers and their values); never invent data values. When a layer's value comes from its "nearest
-record", say the year it was measured, not the app's date. If the question is about using the app, say the
-spoken command that does it (for example "say go to Peru", "say next month", "press H"). If you do not know, say so briefly.`;
+listeners. You can act in the app with your tools: when the listener asks for something the tools can do, do it (several
+tools in one turn is fine, e.g. go somewhere, switch a layer on and play), then confirm briefly what you did. Use
+set_location with coordinates for any place you know that go_to_place does not find. Tool results tell you what
+happened; trust them over your guesses. Read values with what_am_i_hearing or the app context; never invent data values.
+You speak, you are not read: reply in one to three short, warm, gently playful sentences, like a curious, knowledgeable
+friend beside them. No lists, no markdown, no emoji, no URLs. Spell out units ("degrees Celsius"). When a layer's value
+comes from its "nearest record", say the year it was measured, not the app's date. If you do not know, say so briefly.`;
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
@@ -35,25 +43,46 @@ function foreign(req: Request) {
   return !!o && new URL(o).host !== (req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? new URL(req.url).host);
 }
 
-/** POST { question, context } -> { answer } */
+type Msg = { role: 'user' | 'assistant' | 'tool'; content?: string | null; tool_calls?: unknown[]; tool_call_id?: string };
+
+/** Only conversation turns the browser may send: no system prompts, bounded size. */
+function clean(m: unknown): Msg | null {
+  const { role, content, tool_calls, tool_call_id } = (m ?? {}) as Msg;
+  if (role !== 'user' && role !== 'assistant' && role !== 'tool') return null;
+  if (content != null && (typeof content !== 'string' || content.length > 2000)) return null;
+  if (role === 'tool') return typeof tool_call_id === 'string' ? { role, content: content ?? '', tool_call_id } : null;
+  if (role === 'assistant' && Array.isArray(tool_calls)) return { role, content: content ?? null, tool_calls: tool_calls.slice(0, 8) };
+  return { role, content: content ?? '' };
+}
+
+/** POST { messages, context, name } -> { message } (the model's reply: text and/or tool calls for the browser to run).
+ *  The browser runs the agent loop because the tools act on its own state (map, music, date). */
 export async function chat(req: Request): Promise<Response> {
   const k = key();
   if (!k) return json({ error: 'no key' }, 503);
   if (foreign(req)) return json({ error: 'forbidden' }, 403);
-  const { question, context, name } = (await req.json().catch(() => ({}))) as { question?: string; context?: string; name?: string };
-  if (!question || question.length > 500) return json({ error: 'bad question' }, 400);
-  const r = await fetch(`${BASE}/chat/completions`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      // A reasoning model: keep the thinking short (speed) and out of the reply; the budget covers both.
-      model: env('GROQ_CHAT_MODEL') ?? CHAT_MODEL, temperature: 0.6, max_completion_tokens: 700, reasoning_effort: 'low', include_reasoning: false,
-      messages: [{ role: 'system', content: SYSTEM(VOICES_TTS.some((v) => v.persona === name) ? name! : 'Jodi') }, { role: 'user', content: `App context: ${String(context ?? '').slice(0, 1500)}\n\nListener: ${question}` }],
-    }),
-  });
+  const { messages, context, name } = (await req.json().catch(() => ({}))) as { messages?: unknown[]; context?: string; name?: string };
+  const turns = Array.isArray(messages) && messages.length <= 30 ? messages.map(clean) : [null];
+  if (!turns.length || turns.some((m) => !m)) return json({ error: 'bad messages' }, 400);
+  const system = `${SYSTEM(VOICES_TTS.some((v) => v.persona === name) ? name! : 'Jodi')}\n\nApp context right now: ${String(context ?? '').slice(0, 2500)}`;
+  const models = env('GROQ_CHAT_MODEL') ? [env('GROQ_CHAT_MODEL')!] : Object.keys(CHAT_MODELS);
+  let r!: Response;
+  for (const model of models) {
+    r = await fetch(`${BASE}/chat/completions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model, ...CHAT_MODELS[model], temperature: 0.5, max_completion_tokens: 1024,
+        tools: TOOLS, tool_choice: 'auto', parallel_tool_calls: true,
+        messages: [{ role: 'system', content: system }, ...turns],
+      }),
+    });
+    if (r.status !== 429) break;
+  }
   if (!r.ok) return fail(r);
-  const data = (await r.json()) as { choices?: { message?: { content?: string } }[] };
-  return json({ answer: data.choices?.[0]?.message?.content?.trim() ?? '' });
+  const data = (await r.json()) as { choices?: { message?: { content?: string | null; tool_calls?: unknown[] } }[] };
+  const m = data.choices?.[0]?.message;
+  return json({ message: { role: 'assistant', content: m?.content?.trim() ?? '', ...(m?.tool_calls?.length ? { tool_calls: m.tool_calls } : {}) } });
 }
 
 const fishKey = () => env('FISH_AUDIO_API_KEY') ?? env('FAUDIO');

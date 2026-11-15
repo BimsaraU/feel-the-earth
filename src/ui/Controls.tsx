@@ -30,10 +30,13 @@ const useName = () => personaOf(useApp((s) => s.settings.jodiVoice)).toUpperCase
 function PushToTalk() {
   const [on, setOn] = useState(false);
   const stop = useRef<() => void>(() => {});
+  const name = useName();
   if (!canListen) return null;
   const start = () => { stop.current = listen(setOn); };
+  // Touch: a long press must not open the context menu, and a cancelled touch (scroll, palm) still ends listening.
   return (
-    <button type="button" aria-pressed={on} onPointerDown={start} onPointerUp={() => stop.current()}
+    <button type="button" className="hold" aria-pressed={on} onPointerDown={start} onPointerUp={() => stop.current()} onPointerCancel={() => stop.current()}
+      onContextMenu={(e) => e.preventDefault()}
       onKeyDown={(e) => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (on) stop.current(); else start(); } }}>
       {on ? 'Listening…' : `Hold to talk to ${name}`} <kbd>hold J</kbd>
     </button>
@@ -42,6 +45,7 @@ function PushToTalk() {
 
 /** Example phrases, grouped; tapping one runs it. The full grammar is in assist/commands.ts. */
 const SAY: [string, string[]][] = [
+  ['Ask anything', ['Take me to Mount Everest and play the air temperature', 'Why is the sea warm here?', 'Show me lightning over the Congo in 2020']],
   ['Move', ['North', 'Far east', 'Go to Brazil', 'Go to the Pacific Ocean']],
   ['Layers', ['Ocean', 'Lightning', 'Rain', 'Next layer']],
   ['Time', ['Next day', 'Previous month', 'Next year', 'Time travel']],

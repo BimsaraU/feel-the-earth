@@ -56,6 +56,15 @@ function neural(text: string): Promise<Tone.ToneAudioBuffer> {
 
 const timeout = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<never>((_, no) => setTimeout(() => no(new Error('slow')), ms))]);
 
+let captured: string[] | null = null;
+/** Run f with speech held back; resolves to what it would have said (the result of one of JODI's tool calls). */
+export async function capture(f: () => unknown): Promise<string> {
+  const mine: string[] = [];
+  captured = mine;
+  try { await f(); } finally { if (captured === mine) captured = null; }
+  return mine.join(' ');
+}
+
 let gen = 0;
 /** Bumps whenever speech is interrupted; long narrations check it to know they were cut short. */
 export const speechGen = () => gen;
@@ -63,6 +72,7 @@ let queue: Promise<void> = Promise.resolve();
 
 /** Speak and mirror to the aria-live region. Resolves when speech ends (or right away without a voice). */
 export function say(text: string, interrupt = true): Promise<void> {
+  if (captured) { captured.push(text); return Promise.resolve(); }
   last = text;
   announce(text);
   const { settings } = useApp.getState();
@@ -130,16 +140,19 @@ export function stopSpeech() {
 
 // ---------- conversation (Groq chat through /api/chat) ----------
 
-/** Ask the assistant a free question about the place, data or app. Resolves to its answer, or null if unavailable. */
-export async function converse(question: string, context: string): Promise<string | null> {
+export type ChatMsg = { role: 'user' | 'assistant' | 'tool'; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string };
+export type ToolCall = { id: string; type: 'function'; function: { name: string; arguments: string } };
+
+/** One step of the assistant (Groq, through /api/chat): its reply to the conversation so far, text and/or tool calls.
+ *  null if unavailable (offline, no key, error). */
+export async function converse(messages: ChatMsg[], context: string): Promise<ChatMsg | null> {
   if (!navigator.onLine) return null;
   try {
     const r = await timeout(fetch(`${import.meta.env.BASE_URL}api/chat`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, context, name: personaOf(useApp.getState().settings.jodiVoice) }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages, context, name: personaOf(useApp.getState().settings.jodiVoice) }),
     }), 20000);
     if (!r.ok) return null;
-    const { answer } = (await r.json()) as { answer?: string };
-    return answer || null;
+    return ((await r.json()) as { message?: ChatMsg }).message ?? null;
   } catch {
     return null;
   }
