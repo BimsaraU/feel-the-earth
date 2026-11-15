@@ -1,6 +1,6 @@
-// Groq calls for the assistant, kept on the server so the API key never reaches the browser.
+// JODI's server side: Groq chat and Fish Audio speech, kept on the server so the API keys never reach the browser.
 // Used by the Vercel functions in this folder and by the dev server (vite.config.ts).
-// Key: GROQ_API_KEY (or GROQ) in the environment; on Vercel, Project Settings > Environment Variables.
+// Keys: GROQ_API_KEY (or GROQ) and FISH_AUDIO_API_KEY (or FAUDIO); on Vercel, Project Settings > Environment Variables.
 
 const BASE = 'https://api.groq.com/openai/v1';
 const CHAT_MODEL = 'openai/gpt-oss-120b';
@@ -11,7 +11,7 @@ const VOICE = 'hannah';
 const env = (k: string) => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env[k];
 const key = () => env('GROQ_API_KEY') ?? env('GROQ');
 
-const SYSTEM = `You are the voice guide of Feel the Earth, an app that turns NASA Earth data into music for blind and sighted
+const SYSTEM = `You are JODI, the friendly voice guide of Feel the Earth (you are a little Earth with a headband), an app that turns NASA Earth data into music for blind and sighted
 listeners. You speak, you are not read: answer in one to three short, warm, natural sentences, like a knowledgeable friend
 beside them. No lists, no markdown, no emoji, no URLs. Spell out units ("degrees Celsius"). Use the app context you are
 given (place, date, layers and their values); never invent data values. When a layer's value comes from its "nearest
@@ -54,19 +54,31 @@ export async function chat(req: Request): Promise<Response> {
   return json({ answer: data.choices?.[0]?.message?.content?.trim() ?? '' });
 }
 
-/** POST { text } (max 200 characters, Orpheus' limit) -> audio/wav */
+/** Fish Audio voice for JODI: public model "Female Voice" (calm, friendly, empathetic). Override with FISH_VOICE. */
+const FISH_VOICE = '2a9605eeafe84974b5b20628d42c0060';
+const fishKey = () => env('FISH_AUDIO_API_KEY') ?? env('FAUDIO');
+
+/** POST { text } (max 200 characters) -> audio. Fish Audio when its key is set (Groq's TTS rate limit is tiny),
+ *  otherwise Groq Orpheus. */
 export async function tts(req: Request): Promise<Response> {
-  const k = key();
+  const fk = fishKey(), k = fk ?? key();
   if (!k) return json({ error: 'no key' }, 503);
   if (foreign(req)) return json({ error: 'forbidden' }, 403);
   const { text } = (await req.json().catch(() => ({}))) as { text?: string };
   if (!text || text.length > 200) return json({ error: 'bad text' }, 400);
-  const r = await fetch(`${BASE}/audio/speech`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ model: TTS_MODEL, voice: env('GROQ_VOICE') ?? VOICE, input: text, response_format: 'wav' }),
-  });
+  const r = fk
+    // s2.1-pro with latency "low" measured ~1 s for a 6 s sentence.
+    ? await fetch('https://api.fish.audio/v1/tts', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${fk}`, 'content-type': 'application/json', model: env('FISH_MODEL') ?? 's2.1-pro' },
+      body: JSON.stringify({ text, reference_id: env('FISH_VOICE') ?? FISH_VOICE, format: 'mp3', latency: 'low', language: 'en' }),
+    })
+    : await fetch(`${BASE}/audio/speech`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: TTS_MODEL, voice: env('GROQ_VOICE') ?? VOICE, input: text, response_format: 'wav' }),
+    });
   if (!r.ok) return fail(r);
   // Same text always gives usable audio: let the browser and CDN keep it.
-  return new Response(r.body, { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=31536000, immutable' } });
+  return new Response(r.body, { headers: { 'content-type': fk ? 'audio/mpeg' : 'audio/wav', 'cache-control': 'public, max-age=31536000, immutable' } });
 }

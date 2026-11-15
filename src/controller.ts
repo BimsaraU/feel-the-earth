@@ -66,7 +66,7 @@ async function boot() {
   const demo = layers.some((l) => l.demo) ? 'This build plays DEMO DATA, not NASA data. ' : '';
   void say(`${demo}Feel the Earth. You are listening to ${placeName(g, st().lat, st().lon)}. ` +
     'Arrow keys move the listening window. Plus and minus change its size. Numbers 1 to 9 switch layers. ' +
-    'W: where am I. H: what am I hearing. Comma and full stop step through days. T takes the listening tour. V turns this voice off.');
+    'W: where am I. H: what am I hearing. Comma and full stop step through days. T takes the listening tour. B finds peaks, V valleys. Hold J, or say hey Jodi, to ask me anything; tap J to turn this voice off.');
 }
 
 function applySettings(keyChanged = false) {
@@ -75,7 +75,7 @@ function applySettings(keyChanged = false) {
   engine.setMono(s.mono);
   engine.field?.setEnabled(s.spatial);
   engine.terrain?.setEnabled(s.probe);
-  if (engine.terrain) engine.terrain.beacons = s.beacons;
+  if (engine.terrain) engine.terrain.beacons = s.navBeacons;
   engine.keyRoot = s.keyRoot;
   for (const [id, v] of engine.voices) v.setLevel(s.layerDb[id] ?? 0);
   haptics.enabled = s.haptics;
@@ -491,17 +491,20 @@ export async function askWhat() {
 
 const topLayer = () => { const a = st().active; return a.length ? layerInfo(a[a.length - 1]) : undefined; };
 
-/** Where the highest and lowest values near the window are; their beacons ping for a few seconds. */
-export function askBeacons() {
+/** Where the highest (B) and/or lowest (V) value near the window is; its beacon pings for a few seconds. */
+export function askBeacons(which: 'peak' | 'valley' | 'both' = 'both') {
   const top = topLayer(), r = engine.terrain?.last;
   if (!top || !r) { void say('No layer on the map to search.'); return; }
   if (!r.peak || !r.valley) { void say(`${top.name} is flat or missing around here.`); return; }
   const { size } = st();
-  const where = (s: NonNullable<typeof r.peak>) => (s.dist < 0.12 ? 'right here'
-    : `${spokenNumber(s.dist * size)} degrees ${compassWord(((Math.atan2(s.east, s.north) * 180) / Math.PI + 360) % 360)}`);
-  engine.terrain?.ping(6000);
-  void say(`${top.name}. Highest nearby, the high beacon: ${spokenNumber(denorm(r.peak.t, top))} ${top.unitSpoken}, ${where(r.peak)}. ` +
-    `Lowest nearby, the low beacon: ${spokenNumber(denorm(r.valley.t, top))} ${top.unitSpoken}, ${where(r.valley)}.`);
+  const one = (k: 'peak' | 'valley') => {
+    const s = r[k]!;
+    const where = s.dist < 0.12 ? 'right here'
+      : `${spokenNumber(s.dist * size)} degrees ${compassWord(((Math.atan2(s.east, s.north) * 180) / Math.PI + 360) % 360)}`;
+    return `${k === 'peak' ? 'Highest nearby, the high beacon' : 'Lowest nearby, the low beacon'}: ${spokenNumber(denorm(s.t, top))} ${top.unitSpoken}, ${where}.`;
+  };
+  engine.terrain?.ping(6000, which === 'both' ? null : which);
+  void say(`${top.name}. ${which === 'both' ? `${one('peak')} ${one('valley')}` : one(which)}`);
 }
 
 export function togglePlay() {

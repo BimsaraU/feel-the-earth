@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { engine } from '../audio/engine';
 import { KEYS, levelWord, norm, voiceFor, VOICES } from '../audio/mapping';
 import { placeName, spokenDate, spokenNumber } from '../assist/answers';
-import { canListen, listen, runText } from '../assist/run';
+import { canListen, listen, runText, setWake } from '../assist/run';
 import { say } from '../assist/speech';
 import { runTutorial, skipNarration, stopTutorial } from '../assist/tutorial';
 import {
@@ -22,7 +22,7 @@ const toDays = (iso: string) => Math.round(Date.parse(iso + 'T00:00:00Z') / DAY)
 const fromDays = (d: number) => new Date(d * DAY).toISOString().slice(0, 10);
 const coord = (v: number, p: string, n: string) => `${Math.abs(v).toFixed(2)}° ${v >= 0 ? p : n}`;
 
-/** Hold to speak a command (or Enter / K to start and stop). */
+/** Hold to speak to JODI (or Enter / K to start and stop; J held anywhere). */
 function PushToTalk() {
   const [on, setOn] = useState(false);
   const stop = useRef<() => void>(() => {});
@@ -31,7 +31,7 @@ function PushToTalk() {
   return (
     <button type="button" aria-pressed={on} onPointerDown={start} onPointerUp={() => stop.current()}
       onKeyDown={(e) => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (on) stop.current(); else start(); } }}>
-      {on ? 'Listening…' : 'Hold to ask'} <kbd>K</kbd>
+      {on ? 'Listening…' : 'Hold to talk to JODI'} <kbd>hold J</kbd>
     </button>
   );
 }
@@ -146,17 +146,24 @@ function Item({ title, children, open, onToggle }: { title: string; children: Re
   );
 }
 
+/** JODI's stand-in avatar: a small wobbling orange Earth with a face. Listening glows, thinking orbits, speaking bounces. */
+function JodiBall() {
+  const state = useApp((s) => s.jodi);
+  return <span className={`jodi jodi-${state}`} aria-hidden="true"><span className="jodi-face" /></span>;
+}
+
 /** The audio assistant: everything that answers in words, on its own button. */
 function Assistant() {
   const voice = useApp((s) => s.settings.voice);
   return (
     <div className="assistant glass" id="assistant" role="region" aria-label="Audio assistant">
-      <h2 className="panel-title">Ask about this place</h2>
+      <h2 className="panel-title">Ask JODI</h2>
       <button type="button" onClick={askWhere}>Where am I? <kbd>W</kbd></button>
       <button type="button" onClick={() => void askWhat()}>What am I hearing? <kbd>H</kbd></button>
-      <button type="button" onClick={askBeacons}>Find peak and valley <kbd>B</kbd></button>
+      <button type="button" onClick={() => askBeacons('peak')}>Find the peak <kbd>B</kbd></button>
+      <button type="button" onClick={() => askBeacons('valley')}>Find the valley <kbd>V</kbd></button>
       <button type="button" onClick={() => void runTutorial()}>Listening tour <kbd>T</kbd></button>
-      <button type="button" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>V</kbd></button>
+      <button type="button" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>tap J</kbd></button>
       <PushToTalk />
       <CommandBox />
     </div>
@@ -396,7 +403,8 @@ function Settings() {
       <label className="check"><input type="checkbox" checked={s.mono} onChange={(e) => setSettings({ mono: e.target.checked })} /> Mono mix</label>
       <label className="check"><input type="checkbox" checked={s.spatial} onChange={(e) => setSettings({ spatial: e.target.checked })} /> Spatial field: hear each place from its direction (headphones)</label>
       <label className="check"><input type="checkbox" checked={s.probe} onChange={(e) => setSettings({ probe: e.target.checked })} /> Contour ticks (haptic)</label>
-      <label className="check"><input type="checkbox" checked={s.beacons} onChange={(e) => setSettings({ beacons: e.target.checked })} /> Peak and valley beacons while moving</label>
+      <label className="check"><input type="checkbox" checked={s.navBeacons} onChange={(e) => setSettings({ navBeacons: e.target.checked })} /> Navigation sounds: peak and valley beacons while moving</label>
+      {canListen && <label className="check"><input type="checkbox" checked={s.wakeWord} onChange={(e) => setSettings({ wakeWord: e.target.checked })} /> Listen for "Hey Jodi" (microphone)</label>}
       <label className="check"><input type="checkbox" checked={s.highContrast} onChange={(e) => setSettings({ highContrast: e.target.checked })} /> High contrast</label>
     </div>
   );
@@ -436,6 +444,8 @@ export function Controls() {
     window.addEventListener('fte-assistant', assistant);
     return () => { window.removeEventListener('fte-menu', menu); window.removeEventListener('fte-assistant', assistant); };
   }, []);
+  const wakeWord = useApp((s) => s.settings.wakeWord);
+  useEffect(() => setWake(wakeWord), [wakeWord]);
 
   const body: Record<(typeof ITEMS)[number], ReactNode> = {
     Layers: <Layers />, Time: <Time />, Window: <WindowControls />, Settings: <Settings />, 'About the data': <About />,
@@ -448,8 +458,9 @@ export function Controls() {
       <HomeTime />
       <nav className="bar glass" aria-label="Main">
         <Transport />
-        <button type="button" aria-expanded={panel === 'assistant'} aria-controls="assistant" onClick={() => setPanel(panel === 'assistant' ? null : 'assistant')}>
-          Assistant <kbd>A</kbd>
+        <button type="button" aria-expanded={panel === 'assistant'} aria-controls="assistant" onClick={() => setPanel(panel === 'assistant' ? null : 'assistant')}
+          className="jodi-btn" aria-label="JODI, the voice assistant">
+          <JodiBall /> JODI <kbd>A</kbd>
         </button>
         <button type="button" aria-expanded={open} aria-controls="sidebar" onClick={() => setPanel(open ? null : 'menu')}>
           {open ? 'Close' : 'Menu'} <kbd>M</kbd>

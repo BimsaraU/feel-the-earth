@@ -31,11 +31,11 @@ Assets are committed. To rebuild them (needs network):
 | 1 to 4 | Toggle layers |
 | , and . / Shift+, and . | Day / month back and forward |
 | W / H | Where am I? / What am I hearing? |
-| B | Find peak and valley: where the highest and lowest values nearby are (their beacons ping) |
+| B / V | Find the peak / the valley: where the highest / lowest value nearby is (its beacon pings) |
 | A | Audio assistant panel |
 | G | Arrows turn the globe instead |
 | T | Listening tour: narrated guide to every sound and why it sounds that way (Esc ends it) |
-| V | Voice guide on / off (spoken help; captions stay) |
+| J (hold) | Talk to JODI, the voice assistant (or say "Hey Jodi"). A quick tap turns the voice guide on / off |
 | Y | Time travel on / off (one step per bar) |
 | M | Menu (sidebar) |
 | Space | Play / pause |

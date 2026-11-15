@@ -253,7 +253,7 @@ export function Globe() {
       role="application"
       tabIndex={0}
       aria-roledescription="globe"
-      aria-label="Globe. The listening window is the centre of the view. Drag to turn the globe, scroll or pinch to zoom, click a place to glide there. Arrow keys glide, plus and minus resize the window, W says where you are, H says what you hear, B finds the nearest peak and valley, A opens the audio assistant, M opens the menu."
+      aria-label="Globe. The listening window is the centre of the view. Drag to turn the globe, scroll or pinch to zoom, click a place to glide there. Arrow keys glide, plus and minus resize the window, W says where you are, H says what you hear, B finds the nearest peak, V the nearest valley, hold J to talk to JODI, A opens the assistant, M opens the menu."
     />
   );
 }

@@ -40,7 +40,7 @@ Spans read "at layer minimum → at layer maximum" of the window mean.
 | Point roughness (spread inside it) | Articulation: smooth places long soft grains (0.42 s), patchy places short plucked ones (0.1 s). |
 | Point past its layer's danger line | Harmony: a semitone clash above its chord tone. |
 | Contours, while moving | Silent haptic tick at every 1/16 of value crossed (40 % absolute, 60 % local scale). |
-| Highest and lowest value within 1.25 window widths | Beacons at their true bearing: peak = two rising high notes, valley = two falling low notes, fixed pitch; pings get faster and louder as you approach. B speaks where they are. |
+| Highest and lowest value within 1.25 window widths | Beacons at their true bearing: peak = two rising high notes, valley = two falling low notes, fixed pitch; pings get faster and louder as you approach. B speaks where the peak is, V the valley. |
 
 ## Events
 

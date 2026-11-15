@@ -18,9 +18,13 @@ export interface Settings {
   spatial: boolean;
   /** Contour haptics while the window moves. */
   probe: boolean;
-  /** Peak/valley beacons ping while the window moves. Off by default: they compete with the music. */
-  beacons: boolean;
+  /** Peak/valley beacons ping while the window moves. Optional: they compete with the music. (Renamed from 'beacons', whose saved false came from an old default.) */
+  navBeacons: boolean;
+  /** Listen in the background for "Hey Jodi" (needs the microphone). */
+  wakeWord: boolean;
 }
+
+export type JodiState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 /** The data map around the window, HALO times its size, sampled for every active layer. Feeds the 3D view and the surround field. */
 export interface Halo { box: BBox; n: number; lat: number; lon: number; size: number; grids: Partial<Record<LayerId, Float32Array>> }
@@ -48,6 +52,8 @@ export interface AppState {
   /** Date of the record heard per active layer (nearest frame when the date is outside its record). */
   frames: Partial<Record<LayerId, string | null>>;
   halo: Halo | null;
+  /** What the assistant JODI is doing, for its avatar. */
+  jodi: JodiState;
   settings: Settings;
   set: (p: Partial<AppState>) => void;
   setSettings: (p: Partial<Settings>) => void;
@@ -56,7 +62,9 @@ export interface AppState {
 const SETTINGS_KEY = 'fte-settings';
 const defaults: Settings = {
   masterVolume: 0.7, layerDb: {}, speechRate: 1.1, voice: true, haptics: true, hapticAccents: false,
-  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true, beacons: false,
+  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true, navBeacons: true,
+  // Off on phones: mobile browsers chime every time background recognition restarts.
+  wakeWord: typeof matchMedia !== 'undefined' && !matchMedia('(pointer: coarse)').matches,
 };
 
 function loadSettings(): Settings {
@@ -85,6 +93,7 @@ export const useApp = create<AppState>((set) => ({
   means: {},
   frames: {},
   halo: null,
+  jodi: 'idle',
   settings: loadSettings(),
   set: (p) => set(p),
   setSettings: (p) =>

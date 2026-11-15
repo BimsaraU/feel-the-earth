@@ -1,7 +1,7 @@
 // Terrain: peaks, valleys and contours, read from the halo map (the top layer around the window).
 //  - Beacons. The highest and lowest places within earshot ping from where they are: peak = two rising high
 //    notes, valley = two falling low notes, always the same pitch. Pings speed up and get louder as you close in.
-//    They sound only while the window moves (and briefly after), or for a few seconds on "Find peak and valley".
+//    They sound only while the window moves (and briefly after), or for a few seconds on B (peak) / V (valley).
 //  - Contours. Crossing each 1/16 step of value is a silent haptic tick (40 % absolute + 60 % local scale), so you
 //    feel slopes under the finger without anything changing pitch.
 // Sound only says WHERE things are; what they are is the granular field's job (field.ts).
@@ -112,8 +112,10 @@ export class Terrain {
   private moving = false;
   /** Contour ticks. */
   enabled = true;
-  /** Beacons ping while moving ("Find peak and valley" pings regardless). */
-  beacons = false;
+  /** Beacons ping while moving (B / V ping on request regardless). */
+  beacons = true;
+  /** Only this beacon pings (B: peak, V: valley); null = both. */
+  private only: 'peak' | 'valley' | null = null;
   /** Latest reading, for "Find peak and valley" and the UI. */
   last: Relief | null = null;
   /** A contour was crossed (dir +1 up, -1 down): haptic detent. */
@@ -139,6 +141,9 @@ export class Terrain {
   /** New data around the window (or another top layer). */
   setHalo(h: Halo | null, layer: LayerInfo | null) {
     const g = h && layer ? h.grids[layer.id] : undefined;
+    // The halo is centred on the window: take its position too, or beacons are placed from wherever the last move
+    // left off (at boot that was 0, 0, which put them dozens of degrees away and out of earshot).
+    if (h) this.pos = { lat: h.lat, lon: h.lon, size: h.size };
     this.halo = g ? h : null;
     this.grid = g && h && layer ? smooth(h, g, layer) : null;
     this.read();
@@ -150,12 +155,14 @@ export class Terrain {
     this.moving = true;
     clearTimeout(this.restTimer);
     this.restTimer = window.setTimeout(() => this.rest(), 350);
-    if (this.beacons) this.ping(800); // a navigation aid: ping while you move, fall silent soon after you stop
+    if (this.beacons) this.ping(800, null); // a navigation aid: ping while you move, fall silent soon after you stop
     this.read();
   }
 
-  /** Let the beacons ping for a while (movement, or "Find peak and valley"). */
-  ping(ms: number) {
+  /** Let the beacons (or just one) ping for a while: movement, or B / V. */
+  ping(ms: number, only: 'peak' | 'valley' | null = null) {
+    // Moving does not cut short a B / V request that is still pinging.
+    if (only || performance.now() > this.until) this.only = only;
     this.until = Math.max(this.until, performance.now() + ms);
     if (!this.timer) this.timer = window.setInterval(() => this.tick(), 40);
     this.tick(); // first ping now, not on the next timer tick
@@ -197,12 +204,13 @@ export class Terrain {
   private tick() {
     if (performance.now() > this.until) { clearInterval(this.timer); this.timer = 0; return; }
     const now = Tone.immediate();
-    for (const b of Object.values(this.pings)) {
+    for (const [k, b] of Object.entries(this.pings)) {
+      if (this.only && k !== this.only) continue;
       const s = b.spot;
       if (!s || s.dist < ARRIVE) continue;
       if (b.next < now) b.next = now + 0.01;
       const near = 1 - Math.min(1, s.dist / 1.25);
-      const f = Tone.Frequency(b.midi + this.keyRoot(), 'midi').toFrequency(), vel = 0.1 + 0.4 * near;
+      const f = Tone.Frequency(b.midi + this.keyRoot(), 'midi').toFrequency(), vel = 0.15 + 0.45 * near;
       while (b.next < now + 0.15) {
         b.synth.triggerAttackRelease(f, 0.05, b.next, vel);
         b.synth.triggerAttackRelease(f * b.ratio, 0.05, b.next + 0.075, vel);

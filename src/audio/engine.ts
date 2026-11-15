@@ -265,7 +265,7 @@ class AudioEngine {
     this.narration = new Tone.Gain(1).connect(master);
     // The grains bypass the music duck: while you move they are the main voice.
     this.field = new Field(new Tone.Gain(Tone.dbToGain(-2)).connect(master), () => this); // Score: keyRoot + mood
-    this.terrain = new Terrain(new Tone.Gain(Tone.dbToGain(-9)).connect(master), () => this.keyRoot); // beacons sit under the music
+    this.terrain = new Terrain(new Tone.Gain(Tone.dbToGain(-6)).connect(master), () => this.keyRoot); // beacons sit just under the music
 
     this.shots = await load(manifest.oneshots);
     for (const name of ['clave', 'framedrum', 'smallbell', 'gong', 'cymbal', 'ratchet', 'thump', 'singingbowl', 'wave', 'whoosh', 'windchime']) {

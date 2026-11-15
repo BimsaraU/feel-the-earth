@@ -1,6 +1,6 @@
 import * as Tone from 'tone';
 import { engine } from '../audio/engine';
-import { useApp } from '../state';
+import { useApp, type JodiState } from '../state';
 
 let flip = false;
 let last = '';
@@ -69,7 +69,12 @@ export function say(text: string, interrupt = true): Promise<void> {
   const parts = chunks(text);
   const useNeural = engine.ready && navigator.onLine && performance.now() > neuralOffUntil;
   const bufs = useNeural ? parts.map((t) => neural(t)) : []; // all requests start now, play in order
+  const jodi = (s: JodiState) => { if (my === gen) useApp.getState().set({ jodi: s }); };
   const run = async () => {
+    jodi('speaking');
+    try { await speak(); } finally { jodi('idle'); }
+  };
+  const speak = async () => {
     for (let i = 0; i < parts.length; i++) {
       if (my !== gen) return;
       if (useNeural && performance.now() > neuralOffUntil) {
@@ -116,6 +121,7 @@ export function stopSpeech() {
   engine.stopClip();
   if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
   engine.duckSpeech(false);
+  useApp.getState().set({ jodi: 'idle' });
 }
 
 // ---------- conversation (Groq chat through /api/chat) ----------
