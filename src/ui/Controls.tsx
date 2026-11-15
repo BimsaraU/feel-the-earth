@@ -5,7 +5,7 @@ import { KEYS, levelWord, norm, voiceFor, VOICES } from '../audio/mapping';
 import { placeName, spokenDate, spokenNumber } from '../assist/answers';
 import { canListen, listen, runText, setWake } from '../assist/run';
 import { say } from '../assist/speech';
-import { VOICES_TTS } from '../assist/voices';
+import { personaOf, VOICES_TTS } from '../assist/voices';
 import { runTutorial, skipNarration, stopTutorial } from '../assist/tutorial';
 import {
   askBeacons, askWhat, askWhere, dateBounds, geo, glideStart, glideStop, moveBy, setDate, setSize, setTravelling, sizeDone, stepDate,
@@ -23,6 +23,9 @@ const toDays = (iso: string) => Math.round(Date.parse(iso + 'T00:00:00Z') / DAY)
 const fromDays = (d: number) => new Date(d * DAY).toISOString().slice(0, 10);
 const coord = (v: number, p: string, n: string) => `${Math.abs(v).toFixed(2)}° ${v >= 0 ? p : n}`;
 
+/** The assistant's name in the chosen voice, upper case for labels (JODI, or GOJO in Gojo's voice). */
+const useName = () => personaOf(useApp((s) => s.settings.ttsVoice)).toUpperCase();
+
 /** Hold to speak to JODI (or Enter / K to start and stop; J held anywhere). */
 function PushToTalk() {
   const [on, setOn] = useState(false);
@@ -32,7 +35,7 @@ function PushToTalk() {
   return (
     <button type="button" aria-pressed={on} onPointerDown={start} onPointerUp={() => stop.current()}
       onKeyDown={(e) => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (on) stop.current(); else start(); } }}>
-      {on ? 'Listening…' : 'Hold to talk to JODI'} <kbd>hold J</kbd>
+      {on ? 'Listening…' : `Hold to talk to ${name}`} <kbd>hold J</kbd>
     </button>
   );
 }
@@ -156,15 +159,16 @@ function JodiBall() {
 /** The audio assistant: everything that answers in words, on its own button. */
 function Assistant() {
   const voice = useApp((s) => s.settings.voice);
+  const name = useName();
   return (
     <div className="assistant glass" id="assistant" role="region" aria-label="Audio assistant">
-      <h2 className="panel-title">Ask JODI</h2>
+      <h2 className="panel-title">Ask {name}</h2>
       <button type="button" onClick={askWhere}>Where am I? <kbd>W</kbd></button>
       <button type="button" onClick={() => void askWhat()}>What am I hearing? <kbd>H</kbd></button>
       <button type="button" onClick={() => askBeacons('peak')}>Find the peak <kbd>B</kbd></button>
       <button type="button" onClick={() => askBeacons('valley')}>Find the valley <kbd>V</kbd></button>
       <button type="button" onClick={() => void runTutorial()}>Listening tour <kbd>T</kbd></button>
-      <button type="button" onClick={() => void runTutorial('assistant')}>How to talk to JODI <kbd>Shift T</kbd></button>
+      <button type="button" onClick={() => void runTutorial('assistant')}>How to talk to {name} <kbd>Shift T</kbd></button>
       <button type="button" onClick={toggleVoice} aria-pressed={voice}>Voice guide {voice ? 'on' : 'off'} <kbd>tap J</kbd></button>
       <PushToTalk />
       <CommandBox />
@@ -392,8 +396,8 @@ function Settings() {
           min={-18} max={6} step={1} format={(x) => `${x > 0 ? '+' : ''}${x} dB`}
           onChange={(x) => setSettings({ layerDb: { ...useApp.getState().settings.layerDb, [v.layer]: x } })} />
       ))}
-      <label className="field">JODI's voice
-        <select value={s.ttsVoice} onChange={(e) => { setSettings({ ttsVoice: e.target.value }); void say(`Hi, I'm Jodi. This is my new voice.`); }}>
+      <label className="field">Assistant's voice
+        <select value={s.ttsVoice} onChange={(e) => { setSettings({ ttsVoice: e.target.value }); void say(`Hi, I'm ${personaOf(e.target.value)}. This is my voice.`); }}>
           {VOICES_TTS.map((v) => <option key={v.id} value={v.id}>{v.name} ({v.note})</option>)}
         </select>
       </label>
@@ -411,7 +415,7 @@ function Settings() {
       <label className="check"><input type="checkbox" checked={s.spatial} onChange={(e) => setSettings({ spatial: e.target.checked })} /> Spatial field: hear each place from its direction (headphones)</label>
       <label className="check"><input type="checkbox" checked={s.probe} onChange={(e) => setSettings({ probe: e.target.checked })} /> Contour ticks (haptic)</label>
       <label className="check"><input type="checkbox" checked={s.navBeacons} onChange={(e) => setSettings({ navBeacons: e.target.checked })} /> Navigation sounds: peak and valley beacons while moving</label>
-      {canListen && <label className="check"><input type="checkbox" checked={s.wakeWord} onChange={(e) => setSettings({ wakeWord: e.target.checked })} /> Listen for "Hey Jodi" (microphone)</label>}
+      {canListen && <label className="check"><input type="checkbox" checked={s.wakeWord} onChange={(e) => setSettings({ wakeWord: e.target.checked })} /> Listen for "Hey Jodi" or "Hey Gojo" (microphone)</label>}
       <label className="check"><input type="checkbox" checked={s.highContrast} onChange={(e) => setSettings({ highContrast: e.target.checked })} /> High contrast</label>
     </div>
   );
@@ -431,6 +435,7 @@ const ITEMS = ['Layers', 'Time', 'Window', 'Settings', 'About the data'] as cons
 
 export function Controls() {
   const [panel, setPanel] = useState<'menu' | 'assistant' | null>(null);
+  const name = useName();
   const open = panel === 'menu';
   const [item, setItem] = useState<(typeof ITEMS)[number] | null>('Layers');
   const bar = useRef<HTMLElement>(null);
@@ -466,8 +471,8 @@ export function Controls() {
       <nav className="bar glass" aria-label="Main">
         <Transport />
         <button type="button" aria-expanded={panel === 'assistant'} aria-controls="assistant" onClick={() => setPanel(panel === 'assistant' ? null : 'assistant')}
-          className="jodi-btn" aria-label="JODI, the voice assistant">
-          <JodiBall /> JODI <kbd>A</kbd>
+          className="jodi-btn" aria-label={`${name}, the voice assistant`}>
+          <JodiBall /> {name} <kbd>A</kbd>
         </button>
         <button type="button" aria-expanded={open} aria-controls="sidebar" onClick={() => setPanel(open ? null : 'menu')}>
           {open ? 'Close' : 'Menu'} <kbd>M</kbd>

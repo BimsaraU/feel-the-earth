@@ -49,7 +49,7 @@ describe('assistant commands', () => {
 describe('wake word', () => {
   it('hears Hey Jodi and its usual mishearings, not the bare name in speech', async () => {
     const { WAKE } = await import('./commands');
-    for (const s of ['hey Jodi', 'Hey Jody, go to Peru', 'ok judy what is this', 'hi jodie']) expect(WAKE.test(s)).toBe(true);
+    for (const s of ['hey Jodi', 'Hey Jody, go to Peru', 'ok judy what is this', 'hi jodie', 'hey Gojo', 'hey go joe take me to Peru']) expect(WAKE.test(s)).toBe(true);
     for (const s of ['jodi', 'the jodhpur heat', 'hey there']) expect(WAKE.test(s)).toBe(false);
   });
 });

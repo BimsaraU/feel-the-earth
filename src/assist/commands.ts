@@ -241,5 +241,5 @@ export const HELP_TEXT =
   'Wider, narrower, point, whole world. Next day, previous month, next year. Zoom in, zoom out, reset zoom. Louder, quieter, faster, slower. ' +
   'Where am I. What am I hearing. Find the peak. Find the valley. Legend. Tour. Assistant tour. Time travel. Describe on or off. Repeat. Help plays the assistant tour.';
 
-/** "Hey Jodi" and what recognizers commonly hear for it. */
-export const WAKE = /\b(?:hey|hi|hay|a|ok|okay)[,\s]+(?:jodi|jody|jodie|judy|jodhi|joadie|jordy|joti|jodee)\b[,.!?]?/i;
+/** "Hey Jodi" (or "Hey Gojo", the male voice's name) and what recognizers commonly hear for them. */
+export const WAKE = /\b(?:hey|hi|hay|a|ok|okay)[,\s]+(?:jodi|jody|jodie|judy|jodhi|joadie|jordy|joti|jodee|gojo|go jo|go joe|gojou)\b[,.!?]?/i;

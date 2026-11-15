@@ -1,6 +1,7 @@
 import * as Tone from 'tone';
 import { engine } from '../audio/engine';
 import { useApp, type JodiState } from '../state';
+import { personaOf } from './voices';
 
 let flip = false;
 let last = '';
@@ -134,7 +135,7 @@ export async function converse(question: string, context: string): Promise<strin
   if (!navigator.onLine) return null;
   try {
     const r = await timeout(fetch(`${import.meta.env.BASE_URL}api/chat`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, context }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, context, name: personaOf(useApp.getState().settings.ttsVoice) }),
     }), 8000);
     if (!r.ok) return null;
     const { answer } = (await r.json()) as { answer?: string };

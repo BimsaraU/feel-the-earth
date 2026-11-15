@@ -13,7 +13,7 @@ const VOICE = 'hannah';
 const env = (k: string) => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env[k];
 const key = () => env('GROQ_API_KEY') ?? env('GROQ');
 
-const SYSTEM = `You are JODI, the friendly voice guide of Feel the Earth (you are a little Earth with a headband), an app that turns NASA Earth data into music for blind and sighted
+const SYSTEM = (name: string) => `You are ${name}, the friendly voice guide of Feel the Earth (you are a little Earth with a headband), an app that turns NASA Earth data into music for blind and sighted
 listeners. You speak, you are not read: answer in one to three short, warm, gently playful sentences, like a curious, knowledgeable friend
 beside them. No lists, no markdown, no emoji, no URLs. Spell out units ("degrees Celsius"). Use the app context you are
 given (place, date, layers and their values); never invent data values. When a layer's value comes from its "nearest
@@ -40,7 +40,7 @@ export async function chat(req: Request): Promise<Response> {
   const k = key();
   if (!k) return json({ error: 'no key' }, 503);
   if (foreign(req)) return json({ error: 'forbidden' }, 403);
-  const { question, context } = (await req.json().catch(() => ({}))) as { question?: string; context?: string };
+  const { question, context, name } = (await req.json().catch(() => ({}))) as { question?: string; context?: string; name?: string };
   if (!question || question.length > 500) return json({ error: 'bad question' }, 400);
   const r = await fetch(`${BASE}/chat/completions`, {
     method: 'POST',
@@ -48,7 +48,7 @@ export async function chat(req: Request): Promise<Response> {
     body: JSON.stringify({
       // A reasoning model: keep the thinking short (speed) and out of the reply; the budget covers both.
       model: env('GROQ_CHAT_MODEL') ?? CHAT_MODEL, temperature: 0.6, max_completion_tokens: 700, reasoning_effort: 'low', include_reasoning: false,
-      messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `App context: ${String(context ?? '').slice(0, 1500)}\n\nListener: ${question}` }],
+      messages: [{ role: 'system', content: SYSTEM(VOICES_TTS.some((v) => v.persona === name) ? name! : 'Jodi') }, { role: 'user', content: `App context: ${String(context ?? '').slice(0, 1500)}\n\nListener: ${question}` }],
     }),
   });
   if (!r.ok) return fail(r);
