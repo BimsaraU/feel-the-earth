@@ -5,6 +5,7 @@ import { useApp } from '../state';
 import { Controls } from './Controls';
 import { Galaxy } from './Galaxy';
 import { Globe } from './Globe';
+import StarField from './StarField';
 import { onKey, onKeyUp } from './keyboard';
 
 const START_TEXT = 'Tap or press any key to begin. Headphones recommended.';
@@ -26,6 +27,7 @@ function StartScreen() {
   return (
     <>
       <Galaxy />
+      <StarField aria-hidden="true" />
       <button ref={root} type="button" className="start" autoFocus onPointerDown={startFromGesture} onClick={startFromGesture}>
         <span className="title">Feel the Earth</span>
         <span className="lede">Turn the planet and hear its sea, sky and land as music.</span>
