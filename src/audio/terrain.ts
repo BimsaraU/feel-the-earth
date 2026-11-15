@@ -1,19 +1,14 @@
-// Terrain probe: makes the data feel like ground you travel over.
-// Three cues, all read from the halo map (the top layer around the window) at the window centre:
-//  1. Contour steps. The value under the centre is a held tone on a 16-note pentatonic ladder. Its height is 40 %
-//     absolute (layer range) + 60 % local (range of the neighbourhood), so even a gentle change climbs several
-//     rungs. Every rung crossed is re-struck, like a detent: going uphill is heard as a rising run, downhill as a
-//     falling one, faster travel or steeper data as a faster run.
-//  2. Slope pull. The tone sits (HRTF) in the uphill direction, further out the steeper the slope; on flat data it
-//     is centred. It also brightens with the rate of change.
-//  3. Beacons. The highest and lowest places within earshot ping from where they are: peak = two rising high
-//     notes, valley = two falling low notes. Pings speed up and get louder as you close in, like a parking sensor.
-// The probe sounds only while the window moves (the loop carries the picture at rest); beacons linger a few seconds.
+// Terrain: peaks, valleys and contours, read from the halo map (the top layer around the window).
+//  - Beacons. The highest and lowest places within earshot ping from where they are: peak = two rising high
+//    notes, valley = two falling low notes, always the same pitch. Pings speed up and get louder as you close in.
+//  - Contours. Crossing each 1/16 step of value is a silent haptic tick (40 % absolute + 60 % local scale), so you
+//    feel slopes under the finger without anything changing pitch.
+// Sound only says WHERE things are; what they are is the granular field's job (field.ts).
 
 import * as Tone from 'tone';
 import type { LayerInfo } from '../data/types';
 import type { Halo } from '../state';
-import { norm, scaleNotes } from './mapping';
+import { norm } from './mapping';
 
 /** A place in the halo, as an offset from the window centre in window widths. */
 export interface Spot { lat: number; lon: number; t: number; east: number; north: number; dist: number }
@@ -105,18 +100,11 @@ interface Beacon { synth: Tone.Synth; pan: Tone.Panner3D; spot: Spot | null; nex
 
 export class Terrain {
   private out = new Tone.Gain(1);
-  private probeGain = new Tone.Gain(0);
-  private pluck = new Tone.Gain(0.5);
-  private osc = new Tone.Oscillator({ type: 'sawtooth8', frequency: 220 }).start();
-  private lp = new Tone.Filter(700, 'lowpass');
-  private pan = new Tone.Panner3D({ panningModel: 'HRTF', rolloffFactor: 0 });
   private beacons: Record<'peak' | 'valley', Beacon>;
   private halo: Halo | null = null;
   private grid: Float32Array | null = null;
   private pos = { lat: 0, lon: 0, size: 10 };
   private idx = -1;
-  private lastP = NaN;
-  private lastAt = 0;
   private until = 0; // beacons ping until this time (performance.now)
   private timer = 0;
   private restTimer = 0;
@@ -124,13 +112,12 @@ export class Terrain {
   enabled = true;
   /** Latest reading, for "Find peak and valley" and the UI. */
   last: Relief | null = null;
-  /** A rung was crossed (dir +1 up, -1 down): haptic detent. */
+  /** A contour was crossed (dir +1 up, -1 down): haptic detent. */
   onStep: ((dir: number) => void) | null = null;
   onArrive: ((which: 'peak' | 'valley', spot: Spot) => void) | null = null;
 
   constructor(dest: Tone.InputNode, private keyRoot: () => number) {
     this.out.connect(dest);
-    this.osc.chain(this.lp, this.pluck, this.pan, this.probeGain, this.out);
     const make = (type: 'sine' | 'triangle', octave: number, ratio: number): Beacon => {
       const pan = new Tone.Panner3D({ panningModel: 'HRTF', rolloffFactor: 0 }).connect(this.out);
       const synth = new Tone.Synth({ oscillator: { type }, envelope: { attack: 0.004, decay: 0.16, sustain: 0, release: 0.08 } }).connect(pan);
@@ -160,7 +147,6 @@ export class Terrain {
     this.moving = true;
     clearTimeout(this.restTimer);
     this.restTimer = window.setTimeout(() => this.rest(), 350);
-    this.probeGain.gain.rampTo(Tone.dbToGain(-9), 0.12);
     this.ping(4000);
     this.read();
   }
@@ -173,8 +159,6 @@ export class Terrain {
 
   private rest(now = false) {
     this.moving = false;
-    this.probeGain.gain.rampTo(0, now ? 0.1 : 0.9);
-    this.lp.frequency.rampTo(700, 0.5);
     if (now) this.until = 0;
   }
 
@@ -194,34 +178,14 @@ export class Terrain {
       if (s.dist > 0.4) b.armed = true;
       else if (s.dist < ARRIVE && b.armed && still) { b.armed = false; if (this.moving) this.onArrive?.(k, s); }
     }
-    if (!this.moving || Number.isNaN(r.t)) { if (Number.isNaN(r.t)) this.pluck.gain.rampTo(0, 0.1); return; }
-
-    // 1. Contour steps, with hysteresis so a value sitting on a boundary does not chatter.
-    const notes = scaleNotes(this.keyRoot(), 48, 84, [0, 3, 5, 7, 10]);
-    const p = rung(r, notes.length);
+    if (!this.moving || Number.isNaN(r.t)) return;
+    // Contour detents, with hysteresis so a value sitting on a boundary does not chatter.
+    const p = rung(r, 16);
     if (this.idx < 0 || Math.abs(p - this.idx) > 0.6) {
-      const next = Math.max(0, Math.min(notes.length - 1, Math.round(p)));
-      const dir = Math.sign(next - this.idx);
-      const first = this.idx < 0;
+      const next = Math.round(p), dir = Math.sign(next - this.idx), first = this.idx < 0;
       this.idx = next;
-      const t = Tone.now();
-      this.osc.frequency.rampTo(Tone.Frequency(notes[next], 'midi').toFrequency(), 0.03);
-      this.pluck.gain.cancelScheduledValues(t);
-      this.pluck.gain.setValueAtTime(1, t);
-      this.pluck.gain.linearRampToValueAtTime(0.4, t + 0.22);
       if (!first && dir) this.onStep?.(dir);
-    } else if (this.pluck.gain.value < 0.3) this.pluck.gain.rampTo(0.4, 0.1); // back from a no-data gap
-
-    // 2. Slope pull and rate of change.
-    const steep = Math.hypot(r.east, r.north), k = Math.min(1, steep) / (steep || 1);
-    this.pan.positionX.rampTo(1.5 * r.east * k, 0.15);
-    this.pan.positionZ.rampTo(-1.5 * r.north * k, 0.15);
-    const now = performance.now(), dt = (now - this.lastAt) / 1000;
-    if (dt > 0.01 && dt < 0.3 && !Number.isNaN(this.lastP)) {
-      const rate = Math.min(1, Math.abs(p - this.lastP) / dt / 12); // 12 rungs per second = full brightness
-      this.lp.frequency.rampTo(700 * 6 ** rate, 0.1);
     }
-    this.lastP = p; this.lastAt = now;
   }
 
   private tick() {

@@ -14,9 +14,9 @@ export interface Settings {
   keyRoot: number; // pitch class, 2 = D
   mono: boolean;
   highContrast: boolean;
-  /** Surround field: data around the window as 3D (HRTF) sources that move round you as you travel. */
+  /** Spatial field: Earth-anchored data points around the window, each heard from its true direction (HRTF). */
   spatial: boolean;
-  /** Terrain probe: contour steps, slope pull and peak/valley beacons while the window moves. */
+  /** Peak/valley beacons and contour haptics while the window moves. */
   probe: boolean;
 }
 

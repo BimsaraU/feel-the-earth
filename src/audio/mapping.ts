@@ -104,9 +104,13 @@ export const FEATURES = [
   { feature: 'Land elevation', sound: 'Land ambience: a deep, warm earth rumble; mountain wind joins only above about 600 m and grows to 3,000 m.' },
   { feature: 'No data', sound: 'That layer is silent on that beat (no stand-in sound).' },
   { feature: 'Direction of travel', sound: 'While the window moves the whole mix leans left or right with east-west travel and gets brighter going north, darker going south; the whoosh pans with it.' },
-  { feature: 'Value under the window centre, while moving (terrain probe)', sound: 'A held tone on a 16-rung pentatonic ladder, height 40 % from the layer range and 60 % from the range of the neighbourhood. Each rung crossed is re-struck with a haptic tick: uphill is a rising run, downhill a falling one. The music steps back 5 dB while you move.' },
-  { feature: 'Slope at the centre', sound: 'The probe tone sits in the uphill direction (HRTF: north ahead, east right), further out the steeper the slope, and brightens with the rate of change.' },
-  { feature: 'Highest and lowest value within 1.25 window widths', sound: 'Beacons at their true bearing: peak = two rising high notes, valley = two falling low notes; pings get faster and louder as you approach. B speaks where they are.' },
+  { feature: 'Spatial field: data points around the window', sound: "The map within 1.25 window widths is split into Earth-anchored points a third of a window apart. Each emits short grains heard from its true direction (HRTF: north ahead, east right); nearer is louder and brighter. Moving changes only direction and distance, never a point's pitch, timbre or rhythm." },
+  { feature: 'Point value', sound: 'Grain density (0.15 to 2.4 per second) and loudness, and which chord tone it sings: low places low chord tones, high places high ones (G3 to E6).' },
+  { feature: 'Point gradient (change to its neighbours)', sound: 'Timbre: flat data is a pure tone, fronts and edges bright and metallic (FM index 0.3 to 9.3).' },
+  { feature: 'Point roughness (spread inside it)', sound: 'Articulation: smooth places long soft grains (0.42 s), patchy places short plucked ones (0.1 s).' },
+  { feature: "Point past its layer's danger line", sound: 'Harmony: a semitone clash above its chord tone.' },
+  { feature: 'Contours, while moving', sound: 'Silent haptic tick at every 1/16 of value crossed (40 % absolute, 60 % local scale).' },
+  { feature: 'Highest and lowest value within 1.25 window widths', sound: 'Beacons at their true bearing: peak = two rising high notes, valley = two falling low notes, fixed pitch; pings get faster and louder as you approach. B speaks where they are.' },
 ];
 
 export const EVENT_SOUNDS = [

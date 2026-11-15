@@ -156,7 +156,6 @@ function syncVoices() {
 // ---------- window movement ----------
 
 let lastMove = { t: 0, lat: 0, lon: 0 };
-let regenAt = 0;
 let whooshStop = 0;
 const motion = { e: 0, n: 0 };
 
@@ -198,9 +197,9 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
     scheduleRegen();
   } else {
     scrub();
-    if (st().settings.probe) { engine.setProbing(true); engine.terrain?.move(lat, lon, st().size); }
-    // The notes follow the window while it travels, not only once it rests.
-    if (now - regenAt > 400) { regenAt = now; void regenerate(); }
+    // The loop holds its notes while you travel (it re-reads the window when you stop): pitch never follows motion.
+    engine.setProbing(true);
+    if (st().settings.probe) engine.terrain?.move(lat, lon, st().size);
   }
 }
 

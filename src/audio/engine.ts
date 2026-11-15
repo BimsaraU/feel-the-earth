@@ -72,7 +72,7 @@ export class Voice {
     this.texture?.gain.rampTo(this.enabled && p.textureDb > -Infinity ? Tone.dbToGain(p.textureDb + this.userDb) : 0, Math.max(ramp, 0.3), time);
   }
 
-  /** Queue a new loop from window data. It swaps in on the next beat. */
+  /** Queue a new loop from window data. It swaps in at the next bar line. */
   render(win: WindowData, layer: LayerInfo) {
     this.pending = this.build(win, layer);
     if (!this.current) this.swap(Tone.now());
@@ -121,7 +121,7 @@ export class Voice {
 
   /** Called by the transport on every beat. Returns the step played, for accents. */
   playStep(i: number, time: number, stepSec: number): Step | null {
-    if (this.pending) this.swap(time); // any beat: the notes follow the window while it moves
+    if (i % 4 === 0 && this.pending) this.swap(time);
     const p = this.patterns[this.active];
     if (!this.enabled || !p) return null;
     const step = p.steps[i];
@@ -185,9 +185,9 @@ class AudioEngine {
   /** Called on every bar line, in step with the audio (time travel). */
   onBar: (() => void) | null = null;
   firstLayer: LayerId | null = null;
-  /** Surround field around the window (HRTF, level and position only). */
+  /** Granular spatial field: Earth-anchored data points that sing from where they are (HRTF). */
   field: Field | null = null;
-  /** Terrain probe: contour steps, slope pull and peak/valley beacons while the window moves. */
+  /** Peak/valley beacons and contour haptics. */
   terrain: Terrain | null = null;
 
   private shots: Buffers = {};
@@ -257,7 +257,8 @@ class AudioEngine {
     this.motionTilt.chain(this.motion3d, this.motionWet, master);
     this.events = new Tone.Gain(Tone.dbToGain(-4)).connect(master);
     this.narration = new Tone.Gain(1).connect(master);
-    this.field = new Field(this.duck, () => this.keyRoot);
+    // The grains bypass the music duck: while you move they are the main voice.
+    this.field = new Field(new Tone.Gain(Tone.dbToGain(-2)).connect(master), () => this); // Score: keyRoot + mood
     this.terrain = new Terrain(new Tone.Gain(Tone.dbToGain(-3)).connect(master), () => this.keyRoot);
 
     this.shots = await load(manifest.oneshots);
@@ -422,7 +423,7 @@ class AudioEngine {
     setTimeout(() => this.applyDuck(), Math.min(sec, 1.5) * 1000 + 30);
   }
 
-  /** While the window moves the music steps back 5 dB so the terrain probe reads clearly. */
+  /** While the window moves the music steps back 5 dB so the spatial field reads clearly. */
   setProbing(on: boolean) {
     if (this.probing === on) return;
     this.probing = on;
