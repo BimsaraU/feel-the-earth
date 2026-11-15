@@ -58,7 +58,7 @@ export function createFx(map: MlMap, host: HTMLElement) {
 
   const onLoad = () => {
     map.addSource('fx-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({ id: 'fx-country', type: 'fill', source: 'countries', filter: ['==', ['get', 'id'], -1], paint: { 'fill-color': '#9ef2c9', 'fill-opacity': 0 } }, 'win-fill');
+    map.addLayer({ id: 'fx-country', type: 'fill', source: 'countries', filter: ['==', ['get', 'id'], -1], paint: { 'fill-color': '#ff9f45', 'fill-opacity': 0 } }, 'win-fill');
     map.addLayer({ id: 'fx-line-glow', type: 'line', source: 'fx-lines', paint: { 'line-color': ['get', 'c'], 'line-width': ['*', 22, ['get', 'a']], 'line-blur': 14, 'line-opacity': ['get', 'a'] } }, 'win-fill');
     map.addLayer({ id: 'fx-line', type: 'line', source: 'fx-lines', paint: { 'line-color': '#ffffff', 'line-width': 1.8, 'line-opacity': ['get', 'a'] } }, 'win-fill');
   };
@@ -130,7 +130,7 @@ export function createFx(map: MlMap, host: HTMLElement) {
       case 'border':
         countryLive = false; // re-apply the filter for the new country
         countryFlash = { id: geo?.countryId(f.lat, f.lon) ?? 0, t0: now };
-        centreRing('158,242,201', 120, 900, 2);
+        centreRing('255,159,69', 120, 900, 2);
         break;
       case 'coast':
         if (f.to === 'sea') { centreRing('95,211,255', 180, 1400, 4); centreRing('95,211,255', 110, 1100, 2); }
@@ -211,7 +211,7 @@ export function createFx(map: MlMap, host: HTMLElement) {
       if (timeFlash > 0.01) {
         ctx.strokeStyle = `rgba(255,255,255,${timeFlash})`;
         ctx.lineWidth = 2 + 6 * timeFlash;
-        ctx.shadowColor = '#9ef2c9'; ctx.shadowBlur = 24 * timeFlash;
+        ctx.shadowColor = '#ff9f45'; ctx.shadowBlur = 24 * timeFlash;
         ctx.beginPath();
         const ring = [P(0, 0), P(0, STEPS), P(ROWS, STEPS), P(ROWS, 0)];
         ring.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));

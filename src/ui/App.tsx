@@ -3,7 +3,6 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { glideStop, startFromGesture } from '../controller';
 import { useApp } from '../state';
 import { Controls } from './Controls';
-import { Galaxy } from './Galaxy';
 import { Globe } from './Globe';
 import StarField from './StarField';
 import { onKey, onKeyUp } from './keyboard';
@@ -26,7 +25,6 @@ function StartScreen() {
   }, []);
   return (
     <>
-      <Galaxy />
       <StarField aria-hidden="true" />
       <button ref={root} type="button" className="start" autoFocus onPointerDown={startFromGesture} onClick={startFromGesture}>
         <span className="title">Feel the Earth</span>
@@ -59,7 +57,7 @@ export function App() {
   if (!started) return <StartScreen />;
   return (
     <main className="app">
-      <Galaxy />
+      <StarField aria-hidden="true" clickWarp={false} />
       <Globe />
       <Controls />
     </main>

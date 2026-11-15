@@ -215,7 +215,7 @@ function Layers() {
         steps.forEach((s, i) => {
           const v = Number.isNaN(s.value) ? 0.04 : Math.max(0.04, s.value);
           const [r, g, b] = colour(Number.isNaN(s.value) ? 0 : s.value, id);
-          ctx.fillStyle = i === step ? '#f1fff8' : `rgba(${r},${g},${b},${Number.isNaN(s.value) ? 0.25 : 0.75})`;
+          ctx.fillStyle = i === step ? '#fff8f1' : `rgba(${r},${g},${b},${Number.isNaN(s.value) ? 0.25 : 0.75})`;
           ctx.fillRect(i * bw + 1, h - v * h, bw - 2, v * h);
         });
       }

@@ -24,7 +24,7 @@ const HALVES = [
 const coords = (w: number, e: number): [[number, number], [number, number], [number, number], [number, number]] =>
   [[w, MAX_MERC], [e, MAX_MERC], [e, -MAX_MERC], [w, -MAX_MERC]];
 const BLANK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-const MINT = '#9ef2c9';
+const ACCENT = '#ff9f45';
 const MIN_ZOOM = 0, MAX_ZOOM = 8;
 const GIBS = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
 /** Zoom at which the whole planet fits the container with space around it. */
@@ -204,12 +204,12 @@ export function Globe() {
         // Sharp, glowing coastlines and borders over the imagery (Natural Earth, true geography).
         { id: 'coast-glow', type: 'line', source: 'countries', paint: { 'line-color': '#8fb4ff', 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 2, 6, 5], 'line-blur': 2, 'line-opacity': 0.14 } },
         { id: 'borders', type: 'line', source: 'countries', paint: { 'line-color': '#f2f6ff', 'line-opacity': 0.8, 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.5, 6, 1.3] } },
-        { id: 'win-fill', type: 'fill', source: 'window', paint: { 'fill-color': MINT, 'fill-opacity': 0.05 } },
-        { id: 'win-glow', type: 'line', source: 'window', paint: { 'line-color': MINT, 'line-width': 8, 'line-blur': 7, 'line-opacity': 0.35 } },
-        { id: 'win-line', type: 'line', source: 'window', paint: { 'line-color': '#e9fff4', 'line-width': 1.4, 'line-dasharray': [3, 2] } },
-        { id: 'scan-glow', type: 'line', source: 'scan', paint: { 'line-color': MINT, 'line-width': 10, 'line-blur': 8, 'line-opacity': 0.5 } },
-        { id: 'scan-line', type: 'line', source: 'scan', paint: { 'line-color': '#f1fff8', 'line-width': 1.6 } },
-        { id: 'centre', type: 'circle', source: 'centre', paint: { 'circle-radius': 4, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#f1fff8', 'circle-stroke-width': 1.5 } },
+        { id: 'win-fill', type: 'fill', source: 'window', paint: { 'fill-color': ACCENT, 'fill-opacity': 0.05 } },
+        { id: 'win-glow', type: 'line', source: 'window', paint: { 'line-color': ACCENT, 'line-width': 8, 'line-blur': 7, 'line-opacity': 0.35 } },
+        { id: 'win-line', type: 'line', source: 'window', paint: { 'line-color': '#fff4e9', 'line-width': 1.4, 'line-dasharray': [3, 2] } },
+        { id: 'scan-glow', type: 'line', source: 'scan', paint: { 'line-color': ACCENT, 'line-width': 10, 'line-blur': 8, 'line-opacity': 0.5 } },
+        { id: 'scan-line', type: 'line', source: 'scan', paint: { 'line-color': '#fff8f1', 'line-width': 1.6 } },
+        { id: 'centre', type: 'circle', source: 'centre', paint: { 'circle-radius': 4, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#fff8f1', 'circle-stroke-width': 1.5 } },
       ],
     };
     // Navigation as in NASA Eyes on the Earth: drag spins the globe with inertia, wheel and pinch zoom smoothly,

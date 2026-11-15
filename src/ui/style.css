@@ -5,8 +5,8 @@
   --ink: #eef1fb;
   --muted: rgba(226, 232, 250, 0.6);
   --faint: rgba(226, 232, 250, 0.4);
-  --mint: #9ef2c9;
-  --mint-soft: rgba(158, 242, 201, 0.12);
+  --accent: #ff9f45;
+  --accent-soft: rgba(255, 159, 69, 0.12);
   --glass: rgba(9, 11, 26, 0.56);
   --glass-strong: rgba(7, 9, 22, 0.88);
   --line: rgba(190, 205, 255, 0.12);
@@ -20,11 +20,11 @@
 }
 
 :root.high-contrast {
-  --bg: #000; --ink: #fff; --muted: #fff; --mint: #ff0; --mint-soft: #222;
+  --bg: #000; --ink: #fff; --muted: #fff; --accent: #ff0; --accent-soft: #222;
   --glass: #000; --glass-strong: #000; --line: #fff; --amber: #ff0;
 }
 @media (prefers-contrast: more) {
-  :root { --bg: #000; --ink: #fff; --muted: #fff; --mint: #ff0; --glass: #000; --glass-strong: #000; --line: #fff; }
+  :root { --bg: #000; --ink: #fff; --muted: #fff; --accent: #ff0; --glass: #000; --glass-strong: #000; --line: #fff; }
 }
 
 * { box-sizing: border-box; }
@@ -43,12 +43,12 @@ button, select {
   border: 1px solid var(--line); border-radius: 14px; padding: 6px 12px; min-height: 48px; min-width: 48px; cursor: pointer;
   transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.08s;
 }
-button:hover { background: var(--mint-soft); border-color: rgba(158, 242, 201, 0.4); }
+button:hover { background: var(--accent-soft); border-color: rgba(255, 159, 69, 0.4); }
 button:active { transform: translateY(1px) scale(0.985); }
-button[aria-pressed='true'], button[aria-expanded='true'] { background: var(--mint-soft); border-color: var(--mint); }
-:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
+button[aria-pressed='true'], button[aria-expanded='true'] { background: var(--accent-soft); border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 select { background: var(--glass-strong); }
-input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
+input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent); }
 
 .glass {
   background: var(--glass);
@@ -64,8 +64,8 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 .hud ::-webkit-scrollbar { display: none; }
 
 /* ---- galaxy backdrop ---- */
-.galaxy { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
-:root.high-contrast .galaxy { display: none; }
+
+
 .galaxy-container { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .galaxy-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 :root.high-contrast .galaxy-container { display: none; }
@@ -81,7 +81,7 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 .start .title { font: 250 clamp(3.4rem, 11vw, 8.5rem)/0.92 var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100, 'WONK' 1; letter-spacing: -0.035em;
   text-shadow: 0 0 60px rgba(140, 160, 255, 0.4); }
 .start .lede { font: 300 clamp(1.05rem, 2vw, 1.3rem)/1.4 var(--serif); font-variation-settings: 'opsz' 24, 'SOFT' 50; color: var(--muted); max-width: 32ch; }
-.start .pulse { font: 400 0.95rem var(--sans); color: var(--mint); margin-top: 14px; padding: 10px 20px; border: 1px solid rgba(158, 242, 201, 0.35); border-radius: 999px;
+.start .pulse { font: 400 0.95rem var(--sans); color: var(--accent); margin-top: 14px; padding: 10px 20px; border: 1px solid rgba(255, 159, 69, 0.35); border-radius: 999px;
   animation: pulse 3.2s ease-in-out infinite; }
 .start .credit { position: absolute; bottom: 24px; left: 0; right: 0; font: 400 0.76rem var(--sans); color: var(--faint); }
 @keyframes pulse { 50% { opacity: 0.4; } }
@@ -104,7 +104,7 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 .coords { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 14px; font-variant-numeric: tabular-nums; }
 .coords dt { font: 400 0.7rem var(--sans); color: var(--faint); }
 .coords dd { font: 400 0.88rem var(--sans); color: var(--ink); }
-.caption { font: 300 0.92rem/1.5 var(--sans); color: var(--muted); margin-top: 12px; padding-left: 12px; border-left: 2px solid var(--mint); min-height: 1.4em;
+.caption { font: 300 0.92rem/1.5 var(--sans); color: var(--muted); margin-top: 12px; padding-left: 12px; border-left: 2px solid var(--accent); min-height: 1.4em;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 .bar { position: absolute; top: var(--gap); right: var(--gap); z-index: 3; display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px; border-radius: 999px; }
@@ -115,10 +115,10 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
   display: grid; place-items: center; background: var(--ink); color: #05070f; }
 .transport svg { width: 22px; height: 22px; fill: currentColor; }
 .transport::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; pointer-events: none;
-  background: conic-gradient(var(--mint) calc(var(--phase, 0) * 360deg), rgba(158, 242, 201, 0.14) 0);
+  background: conic-gradient(var(--accent) calc(var(--phase, 0) * 360deg), rgba(255, 159, 69, 0.14) 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); }
-.transport:hover { background: #fff; box-shadow: 0 0 28px rgba(158, 242, 201, 0.35); }
+.transport:hover { background: #fff; box-shadow: 0 0 28px rgba(255, 159, 69, 0.35); }
 
 .panel-title { font: 340 1.25rem/1.2 var(--serif); font-variation-settings: 'opsz' 48, 'SOFT' 100; padding: 2px 4px 6px; }
 .assistant {
@@ -135,8 +135,8 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 .mapkey-heard .label { width: 100%; }
 .mapkey-heard button { min-height: 36px; padding: 2px 10px; font-size: 0.8rem; border-radius: 999px; }
 .mapkey-marks { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 10px; }
-.mk-window { width: 16px; height: 12px; border: 1.4px dashed #e9fff4; border-radius: 2px; }
-.mk-scan { width: 2px; height: 14px; margin-left: 10px; background: #f1fff8; box-shadow: 0 0 8px var(--mint); }
+.mk-window { width: 16px; height: 12px; border: 1.4px dashed #fff4e9; border-radius: 2px; }
+.mk-scan { width: 2px; height: 14px; margin-left: 10px; background: #fff8f1; box-shadow: 0 0 8px var(--accent); }
 
 .legend { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 .ramp { flex: 1; height: 8px; border-radius: 999px; box-shadow: 0 0 0 1px var(--line); }
@@ -170,13 +170,13 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 .reading .value { font: 300 1.6rem/1.1 var(--serif); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 6px; }
 .reading .unit { font: 300 0.85rem var(--sans); color: var(--muted); }
 .reading .value { font-variation-settings: 'opsz' 72, 'SOFT' 100; }
-.reading .level { margin-left: auto; font: 500 0.76rem var(--sans); color: var(--mint); }
+.reading .level { margin-left: auto; font: 500 0.76rem var(--sans); color: var(--accent); }
 .reading canvas { width: 100%; height: 30px; margin-top: 4px; display: block; }
 
-/* ---- scroll wheel: a dark drum printed with its own scale, lit along its crown, rolling under a fixed mint pointer ---- */
+/* ---- scroll wheel: a dark drum printed with its own scale, lit along its crown, rolling under a fixed accent pointer ---- */
 .wheel-field { margin: 10px 0 14px; }
 .wheel-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 300; font-size: 0.86rem; }
-.wheel-head output { color: var(--mint); font-variant-numeric: tabular-nums; text-align: right; }
+.wheel-head output { color: var(--accent); font-variant-numeric: tabular-nums; text-align: right; }
 .wheel {
   position: relative; height: 60px; margin-top: 6px; border-radius: 14px; cursor: grab; touch-action: none; overflow: hidden; user-select: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -184,7 +184,7 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -10px 14px -8px rgba(0, 0, 0, 0.9), 0 10px 20px -14px #000;
   transition: box-shadow 0.15s;
 }
-.wheel:active { cursor: grabbing; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -10px 14px -8px rgba(0, 0, 0, 0.9), 0 0 0 2px var(--mint-soft); }
+.wheel:active { cursor: grabbing; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -10px 14px -8px rgba(0, 0, 0, 0.9), 0 0 0 2px var(--accent-soft); }
 .wheel-scale { position: absolute; inset: 0; }
 /* each tick sits at the centre and is moved out along the drum (translateX) and foreshortened (scaleX) from JS */
 .wheel-tick { position: absolute; left: 50%; bottom: 8px; width: 1px; height: 9px; margin-left: -0.5px; background: rgba(238, 241, 251, 0.55); transform-origin: center; }
@@ -195,10 +195,10 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 .wheel-shade { position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(90deg, rgba(3, 4, 11, 0.95), rgba(3, 4, 11, 0.35) 16%, transparent 34%, rgba(255, 255, 255, 0.06) 50%, transparent 66%, rgba(3, 4, 11, 0.35) 84%, rgba(3, 4, 11, 0.95)); }
 /* fixed pointer: a notch above and below the drum */
-.wheel-mark { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--mint); box-shadow: 0 0 10px var(--mint); }
+.wheel-mark { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 .wheel-mark::before, .wheel-mark::after { content: ''; position: absolute; left: -5px; border: 6px solid transparent; }
-.wheel-mark::before { top: 0; border-top-color: var(--mint); }
-.wheel-mark::after { bottom: 0; border-bottom-color: var(--mint); }
+.wheel-mark::before { top: 0; border-top-color: var(--accent); }
+.wheel-mark::after { bottom: 0; border-bottom-color: var(--accent); }
 
 /* ---- assistant: typed commands and the phrase list ---- */
 .ask { display: flex; gap: 6px; margin-top: 6px; }
@@ -220,7 +220,7 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
 @media (pointer: fine) { .touchpad { display: none; } }
 
 .resize-handle { width: 48px; height: 48px; display: grid; place-items: center; cursor: nwse-resize; touch-action: none; }
-.resize-handle::before { content: ''; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #f1fff8; background: rgba(158, 242, 201, 0.35); box-shadow: 0 0 16px var(--mint); }
+.resize-handle::before { content: ''; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #fff8f1; background: rgba(255, 159, 69, 0.35); box-shadow: 0 0 16px var(--accent); }
 
 @media (max-width: 860px) {
   :root { --gap: 12px; }
@@ -248,12 +248,12 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--mint); }
   display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; white-space: nowrap;
 }
 .fx-banner-sub { font: 400 0.72rem var(--sans); color: var(--muted); }
-.fx-banner-title { font: 280 clamp(1.8rem, 5vw, 3.4rem)/1 var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100; letter-spacing: -0.02em; color: #fff; text-shadow: 0 0 30px rgba(255, 230, 166, 0.8), 0 0 80px rgba(158, 242, 201, 0.5); }
+.fx-banner-title { font: 280 clamp(1.8rem, 5vw, 3.4rem)/1 var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100; letter-spacing: -0.02em; color: #fff; text-shadow: 0 0 30px rgba(255, 230, 166, 0.8), 0 0 80px rgba(255, 159, 69, 0.5); }
 
 /* ---- listening tour card ---- */
 .tour { position: absolute; left: 50%; bottom: var(--gap); transform: translateX(-50%); width: min(560px, calc(100vw - 2 * var(--gap))); padding: 14px 18px 12px; z-index: 3; background: var(--glass-strong); overflow: hidden; }
 .tour-progress { position: absolute; left: 0; top: 0; right: 0; height: 2px; background: var(--line); }
-.tour-progress span { display: block; height: 100%; background: var(--mint); box-shadow: 0 0 10px var(--mint); transition: width 0.6s; }
+.tour-progress span { display: block; height: 100%; background: var(--accent); box-shadow: 0 0 10px var(--accent); transition: width 0.6s; }
 .tour-title { font: 300 1.6rem/1.15 var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; margin: 4px 0 6px; }
 .tour-text { font: 300 0.92rem/1.45 var(--sans); color: var(--muted); margin-bottom: 8px; }
 .app:has(.tour) .caption { opacity: 0; } /* the tour card shows the words; the caption stays as the live region */
