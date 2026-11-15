@@ -224,7 +224,9 @@ function updateSurface() {
 // A tap still travels at least a quarter width (a full width with Shift), as the keyboard spec asks.
 export type Dir = 'n' | 's' | 'e' | 'w';
 const held = new Set<Dir>();
-const glide = { raf: 0, last: 0, vLat: 0, vLon: 0, travelled: 0, min: 0, dir: 'n' as Dir };
+const glide = { raf: 0, last: 0, vLat: 0, vLon: 0, travelled: 0, min: 0, dir: 'n' as Dir, downAt: 0, tap: false };
+/** A key released within this long is a tap, even if a busy main thread delivered the key-up late. */
+const TAP_MS = 200;
 
 export function glideStart(dir: Dir, full = false) {
   if (!st().started) return;
@@ -232,14 +234,18 @@ export function glideStart(dir: Dir, full = false) {
   glide.dir = dir;
   glide.min = st().size * (full ? 1 : 0.25);
   glide.travelled = 0;
+  glide.downAt = performance.now();
+  glide.tap = false;
   if (glide.raf) return;
   glide.last = performance.now();
   dragStart();
   glide.raf = requestAnimationFrame(glideTick);
 }
 
-export function glideStop(dir: Dir) {
+/** tapMs: how long the key was down by the events' own timestamps (a tap never overshoots its step). */
+export function glideStop(dir: Dir, tapMs = Infinity) {
   held.delete(dir);
+  if (tapMs < TAP_MS && !held.size) glide.tap = true;
 }
 
 /** One discrete step (buttons activated by keyboard, screen readers). */
@@ -278,9 +284,12 @@ function glideTick(now: number) {
     const k = 1 - Math.exp(-dt * 9); // ease towards the target velocity
     glide.vLat += ((held.has('n') ? speed : 0) - (held.has('s') ? speed : 0) - glide.vLat) * k;
     glide.vLon += ((held.has('e') ? speed : 0) - (held.has('w') ? speed : 0) - glide.vLon) * k;
-    if (!held.size && Math.hypot(glide.vLat, glide.vLon) < speed * 0.03) return glideEnd();
-    glide.travelled += Math.hypot(glide.vLat, glide.vLon) * dt;
-    setCenter(lat + glide.vLat * dt, lon + glide.vLon * dt, false);
+    if (!held.size && (glide.tap || Math.hypot(glide.vLat, glide.vLon) < speed * 0.03)) return glideEnd();
+    // While it could still be a tap, never go past the tap's step.
+    const step = Math.hypot(glide.vLat, glide.vLon) * dt;
+    const f = now - glide.downAt < TAP_MS && step > 0 ? Math.max(0, Math.min(1, (glide.min - glide.travelled) / step)) : 1;
+    glide.travelled += step * f;
+    setCenter(lat + glide.vLat * dt * f, lon + glide.vLon * dt * f, false);
   }
   glide.raf = requestAnimationFrame(glideTick);
 }

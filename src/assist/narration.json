@@ -1,4 +1,6 @@
 [
+  { "id": "start", "tour": "start", "title": "Start",
+    "text": "Tap or press any key to begin. Headphones recommended." },
   { "id": "welcome", "tour": "welcome", "title": "Welcome",
     "text": "Welcome to Feel the Earth, your Earth information jukebox. Get ready to experience the world through sound! I'm Jodi, your personal guide, and I'm going to walk you through this journey with my voice. Every single note you hear from now on is data collected by NASA. You can explore all kinds of maps by ear, like ocean currents and sea surface temperature, night lights, lightning seen from the space station, aerosols, and many more. Here's how the map speaks to you. Imagine a listening window resting over the globe. Every few seconds, a scan sweeps across that window from west to east, from your left ear to your right ear. As the scan moves, real Earth data is turned into music." },
   { "id": "welcome-end", "tour": "welcome", "title": "Welcome",

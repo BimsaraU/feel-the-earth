@@ -38,16 +38,17 @@ const voiceCache = new Map<string, Promise<Tone.ToneAudioBuffer>>();
 let neuralOffUntil = 0;
 
 function neural(text: string): Promise<Tone.ToneAudioBuffer> {
-  let p = voiceCache.get(text);
+  const voice = useApp.getState().settings.ttsVoice, key = voice + text;
+  let p = voiceCache.get(key);
   if (!p) {
-    p = fetch(`${import.meta.env.BASE_URL}api/tts`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) })
+    p = fetch(`${import.meta.env.BASE_URL}api/tts`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, voice }) })
       .then(async (r) => {
         if (!r.ok) throw new Error(`tts ${r.status}`);
         return new Tone.ToneAudioBuffer(await Tone.getContext().decodeAudioData(await r.arrayBuffer()));
       });
-    p.catch(() => { voiceCache.delete(text); neuralOffUntil = performance.now() + 60_000; });
+    p.catch(() => { voiceCache.delete(key); neuralOffUntil = performance.now() + 60_000; });
     if (voiceCache.size > 300) voiceCache.delete(voiceCache.keys().next().value!);
-    voiceCache.set(text, p);
+    voiceCache.set(key, p);
   }
   return p;
 }

@@ -1,7 +1,7 @@
 import * as Tone from 'tone';
 
 /** Bump when files under public/audio change, so browsers drop the old copies. */
-const CACHE = 'fte-audio-v2'; // v2: narration re-recorded in JODI's voice
+const CACHE = 'fte-audio-v3'; // v3: narration re-recorded in JODI's voice (Sarah)
 
 /**
  * Load an audio file into a Tone buffer through the browser's Cache Storage: the first visit downloads it, every

@@ -7,6 +7,8 @@ import { useApp } from '../state';
 import { rotateGlobe } from './Globe';
 
 const ARROWS: Record<string, 'n' | 's' | 'e' | 'w'> = { ArrowUp: 'n', ArrowDown: 's', ArrowRight: 'e', ArrowLeft: 'w' };
+/** Key-down time per arrow (event timestamps), so a tap is told from a hold even when events arrive late. */
+const downAt: Partial<Record<'n' | 's' | 'e' | 'w', number>> = {};
 
 export function onKey(e: KeyboardEvent) {
   const t = e.target as HTMLElement;
@@ -20,7 +22,7 @@ export function onKey(e: KeyboardEvent) {
     if (useApp.getState().globeMode) {
       const d = e.shiftKey ? 30 : 10;
       rotateGlobe(dir === 'n' ? d : dir === 's' ? -d : 0, dir === 'e' ? d : dir === 'w' ? -d : 0);
-    } else if (!e.repeat) glideStart(dir, e.shiftKey); // held keys glide until keyup
+    } else if (!e.repeat) { downAt[dir] = e.timeStamp; glideStart(dir, e.shiftKey); } // held keys glide until keyup
   } else if (e.key === '+' || e.key === '=') resize(1);
   else if (e.key === '-' || e.key === '_') resize(-1);
   else if (/^Digit[1-9]$/.test(e.code)) {
@@ -68,5 +70,5 @@ function jodiUp() {
 export function onKeyUp(e: KeyboardEvent) {
   if (e.code === 'KeyJ') jodiUp();
   const dir = ARROWS[e.key];
-  if (dir) glideStop(dir);
+  if (dir) glideStop(dir, e.timeStamp - (downAt[dir] ?? -Infinity));
 }

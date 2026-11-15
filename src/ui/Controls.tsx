@@ -5,6 +5,7 @@ import { KEYS, levelWord, norm, voiceFor, VOICES } from '../audio/mapping';
 import { placeName, spokenDate, spokenNumber } from '../assist/answers';
 import { canListen, listen, runText, setWake } from '../assist/run';
 import { say } from '../assist/speech';
+import { VOICES_TTS } from '../assist/voices';
 import { runTutorial, skipNarration, stopTutorial } from '../assist/tutorial';
 import {
   askBeacons, askWhat, askWhere, dateBounds, geo, glideStart, glideStop, moveBy, setDate, setSize, setTravelling, sizeDone, stepDate,
@@ -391,6 +392,11 @@ function Settings() {
           min={-18} max={6} step={1} format={(x) => `${x > 0 ? '+' : ''}${x} dB`}
           onChange={(x) => setSettings({ layerDb: { ...useApp.getState().settings.layerDb, [v.layer]: x } })} />
       ))}
+      <label className="field">JODI's voice
+        <select value={s.ttsVoice} onChange={(e) => { setSettings({ ttsVoice: e.target.value }); void say(`Hi, I'm Jodi. This is my new voice.`); }}>
+          {VOICES_TTS.map((v) => <option key={v.id} value={v.id}>{v.name} ({v.note})</option>)}
+        </select>
+      </label>
       <Wheel label="Speech rate" value={s.speechRate} min={0.6} max={1.8} step={0.1} format={(v) => `${v.toFixed(1)} times`}
         onChange={(v) => setSettings({ speechRate: Math.round(v * 10) / 10 })} />
       <label className="check"><input type="checkbox" checked={s.haptics} onChange={(e) => setSettings({ haptics: e.target.checked })} /> Haptics</label>

@@ -1,5 +1,5 @@
 // Record the tours in JODI's voice: src/assist/narration.json -> public/audio/narration/<id>.mp3, via Fish Audio.
-// Key: FISH_AUDIO_API_KEY (or FAUDIO) in the environment or .env. Voice: same as api/_groq.ts (FISH_VOICE overrides).
+// Key: FISH_AUDIO_API_KEY (or FAUDIO) in the environment or .env. Voice: the default in src/assist/voices.ts (FISH_VOICE overrides).
 // Usage: node scripts/build_narration.mjs [id ...]   (no ids = every line)
 // After re-recording, bump CACHE in src/audio/cache.ts so browsers drop the old clips.
 
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'audio', 'narration');
-const VOICE = 'd38a3e358fc74bf6bf78aa3351add681'; // Harriet's London Voice
+const VOICE = '933563129e564b19a115bedd57b7406a'; // Sarah: DEFAULT_VOICE in src/assist/voices.ts
 
 const dotenv = (() => {
   try {

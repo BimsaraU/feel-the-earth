@@ -109,4 +109,4 @@ recording is CC BY-SA 4.0: our trimmed file `oneshots/singingbowl.mp3` is a deri
 ## Narration
 
 Welcome and tour voice (public/audio/narration) and JODI's live speech: generated with Fish Audio (fish.audio), public voice
-model "Harriet's London Voice". Script: src/assist/narration.json; build: scripts/build_narration.mjs.
+models (Sarah by default; the choices are in src/assist/voices.ts). Script: src/assist/narration.json; build: scripts/build_narration.mjs.

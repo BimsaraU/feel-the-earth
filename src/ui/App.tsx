@@ -18,11 +18,13 @@ function StartScreen() {
     gsap.from(root.current.children, { opacity: 0, y: 24, filter: 'blur(10px)', duration: 1.4, stagger: 0.18, ease: 'power3.out' });
   }, []);
   useEffect(() => {
-    // Best effort: most browsers only allow speech after a gesture, so the text is also on screen and focused.
-    try { speechSynthesis.speak(new SpeechSynthesisUtterance(START_TEXT)); } catch { /* no TTS */ }
+    // Best effort: JODI's recorded line (Fish Audio, scripts/build_narration.mjs), else the browser voice. Most browsers
+    // only allow sound after a gesture, so the text is also on screen and focused.
+    const clip = new Audio(`${import.meta.env.BASE_URL}audio/narration/start.mp3`);
+    clip.play().catch(() => { try { speechSynthesis.speak(new SpeechSynthesisUtterance(START_TEXT)); } catch { /* no TTS */ } });
     const key = (e: KeyboardEvent) => { e.preventDefault(); startFromGesture(); };
     window.addEventListener('keydown', key, { once: true });
-    return () => window.removeEventListener('keydown', key);
+    return () => { window.removeEventListener('keydown', key); clip.pause(); };
   }, []);
   return (
     <>

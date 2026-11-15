@@ -2,6 +2,8 @@
 // Used by the Vercel functions in this folder and by the dev server (vite.config.ts).
 // Keys: GROQ_API_KEY (or GROQ) and FISH_AUDIO_API_KEY (or FAUDIO); on Vercel, Project Settings > Environment Variables.
 
+import { DEFAULT_VOICE, VOICES_TTS } from '../src/assist/voices';
+
 const BASE = 'https://api.groq.com/openai/v1';
 const CHAT_MODEL = 'openai/gpt-oss-120b';
 const TTS_MODEL = 'canopylabs/orpheus-v1-english';
@@ -54,26 +56,24 @@ export async function chat(req: Request): Promise<Response> {
   return json({ answer: data.choices?.[0]?.message?.content?.trim() ?? '' });
 }
 
-/** Fish Audio voice for JODI: public model "Harriet's London Voice" (young, warm, friendly, London accent). Keep in
- *  step with scripts/build_narration.mjs. Override with FISH_VOICE (also tried: 5109f9634e6d45d5a870a2fc29950ef4 sweet
- *  young singer, d8f3b4c1199f4568a767ec54112d2b17 anime-style, bb70d020889b403bb9ef6c9fa3ffb0cc London gurl). */
-const FISH_VOICE = 'd38a3e358fc74bf6bf78aa3351add681';
 const fishKey = () => env('FISH_AUDIO_API_KEY') ?? env('FAUDIO');
 
-/** POST { text } (max 200 characters) -> audio. Fish Audio when its key is set (Groq's TTS rate limit is tiny),
+/** POST { text, voice? } (max 200 characters; voice one of src/assist/voices.ts) -> audio. Fish Audio when its key is set (Groq's TTS rate limit is tiny),
  *  otherwise Groq Orpheus. */
 export async function tts(req: Request): Promise<Response> {
   const fk = fishKey(), k = fk ?? key();
   if (!k) return json({ error: 'no key' }, 503);
   if (foreign(req)) return json({ error: 'forbidden' }, 403);
-  const { text } = (await req.json().catch(() => ({}))) as { text?: string };
+  const { text, voice } = (await req.json().catch(() => ({}))) as { text?: string; voice?: string };
   if (!text || text.length > 200) return json({ error: 'bad text' }, 400);
+  // Only the app's own voices: the key must not voice arbitrary (e.g. cloned) models for others.
+  const ref = VOICES_TTS.some((v) => v.id === voice) ? voice! : env('FISH_VOICE') ?? DEFAULT_VOICE;
   const r = fk
     // s2.1-pro with latency "low" measured ~1 s for a 6 s sentence.
     ? await fetch('https://api.fish.audio/v1/tts', {
       method: 'POST',
       headers: { authorization: `Bearer ${fk}`, 'content-type': 'application/json', model: env('FISH_MODEL') ?? 's2.1-pro' },
-      body: JSON.stringify({ text, reference_id: env('FISH_VOICE') ?? FISH_VOICE, format: 'mp3', latency: 'low', language: 'en' }),
+      body: JSON.stringify({ text, reference_id: ref, format: 'mp3', latency: 'low', language: 'en' }),
     })
     : await fetch(`${BASE}/audio/speech`, {
       method: 'POST',

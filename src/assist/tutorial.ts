@@ -12,11 +12,14 @@ import type { LayerId } from '../data/types';
 import { fx } from '../fx';
 import { useApp } from '../state';
 import NARRATION from './narration.json';
+import { DEFAULT_VOICE } from './voices';
 import { announce, say, speechGen, stopSpeech } from './speech';
 
 let runId = 0;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const st = () => useApp.getState();
+/** The clips are recorded in the default voice. */
+const recorded = () => st().settings.ttsVoice === DEFAULT_VOICE;
 const CLIP = (id: string) => `${import.meta.env.BASE_URL}audio/narration/${id}.mp3`;
 
 /** Back to what the listener had: the loop plays if they had it playing. */
@@ -44,7 +47,8 @@ const segments = (tour: Tour | 'welcome') => (NARRATION as Segment[]).filter((s)
 async function narrate(id: string, i: number, n: number) {
   const seg = NARRATION.find((x) => x.id === id)!;
   st().set({ tour: { i, n, title: seg.title, text: seg.text } });
-  if (!st().settings.voice) return say(seg.text); // captions only, timed to reading speed
+  // Captions only (timed to reading speed) with the voice off; live speech when JODI has another voice than the recording.
+  if (!st().settings.voice || !recorded()) return say(seg.text);
   announce(seg.text);
   try { await engine.playClip(CLIP(id)); } catch { await say(seg.text); }
 }
@@ -149,7 +153,7 @@ export async function welcome(place: string, prefix = '') {
   const [a, b] = segments('welcome');
   for (const [seg, after] of [[a, `You are now listening to ${place}.`], [b, '']] as const) {
     if (!live()) return;
-    if (!st().settings.voice) { await say(seg.text); } else { announce(seg.text); try { await engine.playClip(CLIP(seg.id)); } catch { await say(seg.text); } }
+    if (!st().settings.voice || !recorded()) { await say(seg.text); } else { announce(seg.text); try { await engine.playClip(CLIP(seg.id)); } catch { await say(seg.text); } }
     if (after && live()) await say(after, false);
   }
 }
