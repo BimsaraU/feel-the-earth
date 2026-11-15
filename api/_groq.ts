@@ -97,18 +97,21 @@ export async function tts(req: Request): Promise<Response> {
   if (!text || text.length > 200) return json({ error: 'bad text' }, 400);
   // Only the app's own voices: the key must not voice arbitrary (e.g. cloned) models for others.
   const ref = VOICES_TTS.some((v) => v.id === voice) ? voice! : env('FISH_VOICE') ?? DEFAULT_VOICE;
-  const r = fk
+  const fish = (model: string) => fetch('https://api.fish.audio/v1/tts', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${fk}`, 'content-type': 'application/json', model },
+    body: JSON.stringify({ text, reference_id: ref, format: 'mp3', latency: 'low', language: 'en' }),
+  });
+  let r = fk
     // s2.1-pro with latency "low" measured ~1 s for a 6 s sentence.
-    ? await fetch('https://api.fish.audio/v1/tts', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${fk}`, 'content-type': 'application/json', model: env('FISH_MODEL') ?? 's2.1-pro' },
-      body: JSON.stringify({ text, reference_id: ref, format: 'mp3', latency: 'low', language: 'en' }),
-    })
+    ? await fish(env('FISH_MODEL') ?? 's2.1-pro')
     : await fetch(`${BASE}/audio/speech`, {
       method: 'POST',
       headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' },
       body: JSON.stringify({ model: TTS_MODEL, voice: env('GROQ_VOICE') ?? VOICE, input: text, response_format: 'wav' }),
     });
+  // Out of paid API credit (402): Fish's free model, slower (~2-3 s) but the same voices.
+  if (fk && r.status === 402) r = await fish('s2.1-pro-free');
   if (!r.ok) return fail(r);
   // Same text always gives usable audio: let the browser and CDN keep it.
   return new Response(r.body, { headers: { 'content-type': fk ? 'audio/mpeg' : 'audio/wav', 'cache-control': 'public, max-age=31536000, immutable' } });
