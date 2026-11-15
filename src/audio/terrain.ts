@@ -1,6 +1,7 @@
 // Terrain: peaks, valleys and contours, read from the halo map (the top layer around the window).
 //  - Beacons. The highest and lowest places within earshot ping from where they are: peak = two rising high
 //    notes, valley = two falling low notes, always the same pitch. Pings speed up and get louder as you close in.
+//    They sound only while the window moves (and briefly after), or for a few seconds on "Find peak and valley".
 //  - Contours. Crossing each 1/16 step of value is a silent haptic tick (40 % absolute + 60 % local scale), so you
 //    feel slopes under the finger without anything changing pitch.
 // Sound only says WHERE things are; what they are is the granular field's job (field.ts).
@@ -147,7 +148,7 @@ export class Terrain {
     this.moving = true;
     clearTimeout(this.restTimer);
     this.restTimer = window.setTimeout(() => this.rest(), 350);
-    this.ping(4000);
+    this.ping(800); // beacons are a navigation aid: they ping while you move and fall silent soon after you stop
     this.read();
   }
 

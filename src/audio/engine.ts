@@ -216,9 +216,13 @@ class AudioEngine {
 
   /** Must be called synchronously inside the first user gesture. */
   unlock() {
+    // A larger audio buffer and scheduling lead stop crackles when the map, React and the grains all compete for the
+    // main thread (worst on phones). Costs ~0.1 s of latency on one-shots, which nothing here needs to beat.
+    // Must happen before any Tone node exists. ponytail: 'playback' on touch devices, 'balanced' elsewhere, tune by ear.
+    const touch = matchMedia('(pointer: coarse)').matches;
+    Tone.setContext(new Tone.Context({ latencyHint: touch ? 'playback' : 'balanced', lookAhead: touch ? 0.2 : 0.12 }));
     // Tone.start resumes the context; calling it inside the gesture is what browsers require.
     const started = Tone.start();
-    Tone.getContext().lookAhead = 0.05;
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') void Tone.getContext().resume();
     });
@@ -372,7 +376,12 @@ class AudioEngine {
       buf = await loadBuffer(url);
       this.clips.set(url, buf);
     }
-    const b = buf;
+    return this.playVoice(buf);
+  }
+
+  /** Play a speech buffer on the narration bus, ducking the music. A new clip or stopClip ends it. */
+  playVoice(b: Tone.ToneAudioBuffer): Promise<void> {
+    this.stopClip();
     return new Promise((resolve) => {
       const src = new Tone.ToneBufferSource({ url: b });
       const g = new Tone.Gain(Tone.dbToGain(-1)).connect(this.narration);
@@ -427,6 +436,7 @@ class AudioEngine {
   setProbing(on: boolean) {
     if (this.probing === on) return;
     this.probing = on;
+    if (this.field) this.field.moving = on;
     this.applyDuck();
   }
 

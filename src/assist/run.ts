@@ -6,7 +6,8 @@ import {
 import { MAX_SIZE, MIN_SIZE, useApp } from '../state';
 import { resetZoom, zoomBy } from '../ui/Globe';
 import { HELP_TEXT, matchPlace, parseAlternatives, type Command } from './commands';
-import { lastSaid, say } from './speech';
+import { announce, converse, lastSaid, say } from './speech';
+import { placeName, spokenDate, spokenNumber } from './answers';
 import { runTutorial } from './tutorial';
 
 const BPM = 72;
@@ -81,8 +82,35 @@ export function runCommand(c: Command, heard = '') {
     case 'repeat': void say(lastSaid() || 'Nothing to repeat yet.'); break;
     case 'help': void say(HELP_TEXT); break;
     case 'ambiguous': void say(c.question); break;
-    case 'unknown': void say(heard ? `Sorry, I did not catch "${heard}". Say help for the commands.` : 'Say help for the commands.'); break;
+    case 'unknown': void ask(heard); break;
   }
+}
+
+/** Everything the assistant may know about the moment: place, date, window and each layer's value. */
+function context(): string {
+  const s = st();
+  const layers = s.active.map((id) => {
+    const l = s.layers.find((x) => x.id === id);
+    const m = s.means[id];
+    const f = s.frames[id];
+    return l ? `${l.name} (${voiceFor(id).instrumentSpoken}): ${m === undefined || Number.isNaN(m) ? 'no data here' : `${spokenNumber(m)} ${l.unitSpoken}`}`
+      + `, scale ${l.min} to ${l.max}${f && f !== s.date ? `, nearest record ${spokenDate(f)}` : ''}. Source: ${l.sourceText}` : id;
+  });
+  return [
+    `Place: ${geo ? placeName(geo, s.lat, s.lon) : 'unknown'} (${s.lat.toFixed(1)}, ${s.lon.toFixed(1)}), window ${Math.round(s.size)} degrees wide.`,
+    `Date: ${spokenDate(s.date)}. Music ${s.playing ? 'playing' : 'paused'}.`,
+    `Layers playing: ${layers.join(' | ') || 'none'}.`,
+    `Other layers: ${s.layers.filter((l) => !s.active.includes(l.id)).map((l) => l.name).join(', ')}.`,
+    'Higher values play higher notes; the scan line sweeps the window west to east once per loop; danger adds a tremolo drone and heartbeat.',
+  ].join(' ');
+}
+
+/** Not a command: a question for the conversational assistant (Groq), with the plain fallback when offline. */
+async function ask(heard: string) {
+  if (!heard) { void say('Say help for the commands.'); return; }
+  announce('Thinking…');
+  const answer = await converse(heard, context());
+  void say(answer ?? `Sorry, I did not catch "${heard}". Say help for the commands.`);
 }
 
 /** A typed or spoken phrase, end to end. */

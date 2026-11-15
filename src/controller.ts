@@ -6,7 +6,7 @@ import { moodOf } from './audio/harmony';
 import { denorm, norm, severity, voiceFor } from './audio/mapping';
 import { placeName, spokenDate, spokenNumber, whatAmIHearing, whereAmI } from './assist/answers';
 import { announce, say } from './assist/speech';
-import { source } from './data';
+import { frameDate, source } from './data';
 import { normLon } from './data/fixture';
 import type { BBox, LayerId } from './data/types';
 import { GeoEventTracker, LINE_NAMES, type GeoEvent } from './geo/events';
@@ -40,9 +40,8 @@ async function boot() {
   geo = g;
   tracker = new GeoEventTracker(g);
   tracker.reset(st().lat, st().lon);
-  const [lo, hi] = layers[0].timeRange;
-  const date = st().date < lo ? lo : st().date > hi ? hi : st().date;
-  st().set({ layers, date, started: true, loading: false });
+  // Times are synchronised (every layer plays its nearest record), so start on the most recent date of any layer.
+  st().set({ layers, date: dateBounds(layers)[1], started: true, loading: false });
   haptics.init();
   applySettings();
   useApp.subscribe((s, prev) => { if (s.settings !== prev.settings) applySettings(prev.settings.keyRoot !== s.settings.keyRoot); });
@@ -97,6 +96,7 @@ async function regenerate() {
   const box = bboxOf(lat, lon, size);
   const means: Partial<Record<LayerId, number>> = {};
   const wins = await Promise.all(active.map((id) => source.getWindow(id, box, date, 32)));
+  const frames = Object.fromEntries(await Promise.all(active.map(async (id) => [id, await frameDate(id, date)] as const)));
   // Conductor: the most dangerous active layer sets the ensemble's severity and mood for every voice.
   engine.severity = Math.max(0, ...active.map((id, k) => severity(voiceFor(id), norm(wins[k].stats.mean, layerInfo(id)))));
   engine.mood = moodOf(engine.severity);
@@ -106,7 +106,7 @@ async function regenerate() {
     const pattern = engine.voices.get(id)?.render(win, layerInfo(id));
     void pattern;
   }));
-  st().set({ means });
+  st().set({ means, frames });
   void refreshHalo();
 }
 
@@ -184,7 +184,11 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
     engine.setMotion(motion.e, motion.n);
   }
   clearTimeout(whooshStop);
-  whooshStop = window.setTimeout(() => { engine.setMoveSpeed(0); motion.e = motion.n = 0; engine.setMotion(0, 0); engine.setProbing(false); }, settle ? 250 : 350);
+  whooshStop = window.setTimeout(() => {
+    engine.setMoveSpeed(0); motion.e = motion.n = 0; engine.setMotion(0, 0); engine.setProbing(false);
+    // Moving stopped: end the many-borders clave patter. Only drags ended it before, so key moves left it ticking forever.
+    if (tracker) tracker.tick(performance.now() + 2000).forEach((e) => playEvent(e));
+  }, settle ? 250 : 350);
 
   st().set({ lat, lon });
   engine.field?.move(lat, lon, st().size);
@@ -337,13 +341,8 @@ export function toggleLayer(id: LayerId) {
     st().set({ active: [...active, id] });
     const [lo, hi] = info.timeRange;
     const { date } = st();
-    let moved = '';
-    if (date < lo || date > hi) {
-      const to = date < lo ? lo : hi;
-      st().set({ date: to });
-      moved = ` Its record runs from ${spokenDate(lo)} to ${spokenDate(hi)}, so the date moved to ${spokenDate(to)}.`;
-    }
-    void say(`${info.name} on, ${v.instrumentSpoken}.${info.demo ? ' Demo data.' : ''}${moved}`);
+    const note = date < lo || date > hi ? ` Its record runs from ${spokenDate(lo)} to ${spokenDate(hi)}, so you hear its nearest record.` : '';
+    void say(`${info.name} on, ${v.instrumentSpoken}.${info.demo ? ' Demo data.' : ''}${note}`);
   }
   syncVoices();
   scheduleRegen();
@@ -410,8 +409,7 @@ function travelStep() {
   d.setUTCDate(d.getUTCDate() + days);
   const next = d.toISOString().slice(0, 10);
   // Stop at the end of the record of the layers being heard.
-  const end = st().active.map((id) => layerInfo(id)?.timeRange[1] ?? '').sort().pop() ?? dateBounds()[1];
-  if (next > end) { setTravelling(false); void say('End of the record.'); return; }
+  if (next > dateBounds()[1]) { setTravelling(false); void say('End of the record.'); return; }
   engine.play('ratchet', { db: -14 });
   setDate(next, 'quiet');
 }

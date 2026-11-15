@@ -6,3 +6,5 @@ playwright-report
 *.local
 release
 __pycache__
+.env
+.env.*

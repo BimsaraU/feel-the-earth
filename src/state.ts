@@ -43,6 +43,8 @@ export interface AppState {
   tour: { i: number; n: number; title: string; text: string } | null;
   /** Window mean per active layer, from the last loop regeneration. */
   means: Partial<Record<LayerId, number>>;
+  /** Date of the record heard per active layer (nearest frame when the date is outside its record). */
+  frames: Partial<Record<LayerId, string | null>>;
   halo: Halo | null;
   settings: Settings;
   set: (p: Partial<AppState>) => void;
@@ -71,7 +73,7 @@ export const useApp = create<AppState>((set) => ({
   lat: 7.9,
   lon: 80.7,
   size: 10,
-  date: '2007-11-14', // inside the sea surface temperature record (2007-03-25 .. 2008-03-03)
+  date: '2023-12-28', // replaced at boot by the most recent date of any layer
   playing: false,
   dragging: false,
   globeMode: false,
@@ -79,6 +81,7 @@ export const useApp = create<AppState>((set) => ({
   live: '',
   tour: null,
   means: {},
+  frames: {},
   halo: null,
   settings: loadSettings(),
   set: (p) => set(p),

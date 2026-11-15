@@ -200,6 +200,25 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
 .wheel-mark::before { top: 0; border-top-color: var(--accent); }
 .wheel-mark::after { bottom: 0; border-bottom-color: var(--accent); }
 
+/* ---- home date dial: a pill at rest, the full drum while engaged (camera zoom wheel style) ---- */
+.home-time { position: absolute; left: 50%; bottom: var(--gap); transform: translateX(-50%); z-index: 2;
+  width: 168px; transition: width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.home-time .wheel-field { margin: 0; }
+.home-time .wheel-head { justify-content: center; }
+.home-time .wheel-head span { display: none; }
+.home-time .wheel-head output { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; line-height: 34px; text-align: center;
+  font-weight: 500; pointer-events: none; transition: bottom 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.home-time.open .wheel-head output { bottom: calc(100% + 6px); text-shadow: 0 1px 10px #000; }
+.home-time .wheel { height: 34px; margin: 0; border-radius: 999px; background: var(--glass-strong); backdrop-filter: blur(14px);
+  transition: height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 0.35s, background 0.35s; }
+.home-time .wheel-scale, .home-time .wheel-shade { opacity: 0; transition: opacity 0.25s; }
+.home-time .wheel-mark { opacity: 0; transition: opacity 0.25s; }
+.home-time.open { width: min(560px, calc(100vw - 2 * var(--gap))); }
+.home-time.open .wheel { height: 60px; border-radius: 14px; background: linear-gradient(#1b1f38, #2c3254 46%, #232844 54%, #0e1124); }
+.home-time.open .wheel-scale, .home-time.open .wheel-shade { opacity: 1; }
+.home-time.open .wheel-mark { opacity: 1; }
+.app:has(.tour) .home-time { display: none; }
+
 /* ---- assistant: typed commands and the phrase list ---- */
 .ask { display: flex; gap: 6px; margin-top: 6px; }
 .ask input { flex: 1; min-width: 0; min-height: 48px; padding: 0 12px; font: 400 0.9rem var(--sans); color: var(--ink);
@@ -233,6 +252,7 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
   .bar kbd { display: none; }
   .mapkey { width: auto; right: var(--gap); padding: 10px 12px; }
   .mapkey-marks { display: none; }
+  .home-time { bottom: calc(var(--gap) + 136px); } /* above the full-width map key */
   .sidebar { top: auto; right: 0; left: 0; bottom: 0; width: 100%; max-height: 62vh; border-radius: 20px 20px 0 0; z-index: 4; }
 }
 

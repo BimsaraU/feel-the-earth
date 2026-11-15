@@ -122,6 +122,8 @@ export function parseCommand(raw: string): Command {
   if (has(t, /\b(peak|valley|highest|lowest|beacons?)\b/)) return { kind: 'beacons' };
   if (has(t, /\b(tour|tutorial|guide me)\b/)) return { kind: 'tour' };
   if (has(t, /\btime travel\b/)) return { kind: 'travel', on: !has(t, /\b(off|stop|end)\b/) };
+  // Open questions ("why is the sea warmer to the east") go to the conversational assistant, not to keyword commands.
+  if (/^(why|how|what|which|who|when|is|are|does|do|tell me|explain)\b/.test(t) && t.split(' ').length >= 4) return { kind: 'unknown' };
 
   // "go to France", "take me to India", "show me Brazil" (a layer name wins: "show lightning").
   // The place comes from the raw words: near-miss correction must not turn "Niger" into "night".

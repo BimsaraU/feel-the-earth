@@ -18,6 +18,7 @@ describe('assistant commands', () => {
     ['next month', { kind: 'frame', step: 1, unit: 'month' }],
     ['previous year', { kind: 'frame', step: -1, unit: 'year' }],
     ['next', { kind: 'layerStep', step: 1 }],
+    ['why is the sea warmer to the east', { kind: 'unknown' }], // open question: the conversational assistant
     ['zoom in', { kind: 'zoom', step: 1 }],
     ['wider', { kind: 'window', step: 1 }],
     ['what am I hearing', { kind: 'what' }],

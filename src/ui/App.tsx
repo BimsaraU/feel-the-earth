@@ -7,6 +7,7 @@ import { Globe } from './Globe';
 import StarField from './StarField';
 import { onKey, onKeyUp } from './keyboard';
 
+const COARSE = matchMedia('(pointer: coarse)').matches;
 const START_TEXT = 'Tap or press any key to begin. Headphones recommended.';
 
 function StartScreen() {
@@ -57,7 +58,8 @@ export function App() {
   if (!started) return <StartScreen />;
   return (
     <main className="app">
-      <StarField aria-hidden="true" clickWarp={false} />
+      {/* Behind the globe: on phones the stars hold still (one frame), leaving the GPU and main thread to the map and audio. */}
+      <StarField aria-hidden="true" clickWarp={false} disableAnimation={COARSE} mouseInteraction={!COARSE} dpr={1} />
       <Globe />
       <Controls />
     </main>

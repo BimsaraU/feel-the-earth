@@ -50,7 +50,7 @@ function CommandBox() {
   return (
     <>
       <form className="ask" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { runText(text); setText(''); } }}>
-        <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a command, like go to Peru"
+        <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask anything, or a command like go to Peru"
           aria-label="Type a command" enterKeyHint="go" autoComplete="off" />
         <button type="submit">Run</button>
       </form>
@@ -167,10 +167,11 @@ const short = (v: number) => String(+v.toPrecision(3));
 
 /** Map key: which data the colours on the map are, its scale, and what else is drawn or only heard. */
 function MapKey() {
-  const { layers, active, date } = useApp();
+  const { layers, active, date, frames } = useApp();
   const shown = layers.find((x) => x.id === active[active.length - 1]);
   const heard = active.slice(0, -1).map((id) => layers.find((x) => x.id === id)!).filter(Boolean);
   const inRecord = shown && date >= shown.timeRange[0] && date <= shown.timeRange[1];
+  const frame = shown && frames[shown.id];
   return (
     <section className="mapkey glass" aria-label="Map key">
       <p className="label">Colour on the map</p>
@@ -183,7 +184,7 @@ function MapKey() {
             <span>{short(shown.max)} {shown.unit}</span>
           </div>
           <p className="muted small">
-            {inRecord ? `Heard as ${voiceFor(shown.id).instrument}` : `No data on this date (record ${shown.timeRange[0].slice(0, 4)} to ${shown.timeRange[1].slice(0, 4)})`}
+            Heard as {voiceFor(shown.id).instrument}{!inRecord && frame ? `, nearest record ${spokenDate(frame).replace(/^\d+ /, '')}` : ''}
           </p>
         </>
       ) : <p className="muted small">No data layer. Press 1 to 9 or open the menu.</p>}
@@ -292,7 +293,26 @@ function Time() {
       <button type="button" className="wide" aria-pressed={travelling} onClick={() => setTravelling(!travelling)}>
         Time travel {travelling ? 'on' : 'off'} <kbd>Y</kbd>
       </button>
-      <p className="muted small">Time travel moves the date forward one step per bar: a day for sea temperature, ten days for lightning, a year for night lights.</p>
+      <p className="muted small">Time travel moves the date forward one step per bar: a day for sea temperature, ten days for lightning, a year for night lights. All layers share one date; a layer whose record does not reach it plays its nearest record.</p>
+    </div>
+  );
+}
+
+/** Date dial on the home screen. At rest a small pill with the date; touching, scrolling or focusing it rolls out
+ *  the full drum (like a camera zoom wheel), and it tucks away again a moment after you let go. */
+function HomeTime() {
+  const { date, layers } = useApp();
+  const [lo, hi] = dateBounds(layers);
+  const [open, setOpen] = useState(false);
+  const timer = useRef(0);
+  const engage = () => { clearTimeout(timer.current); setOpen(true); };
+  const release = (ms = 1400) => { clearTimeout(timer.current); timer.current = window.setTimeout(() => setOpen(false), ms); };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return (
+    <div className={`home-time${open ? ' open' : ''}`} onPointerDown={engage} onPointerUp={() => release()} onPointerCancel={() => release()}
+      onWheel={() => { engage(); release(); }} onFocus={engage} onBlur={() => release(200)} onKeyDown={engage} onKeyUp={() => release()}>
+      <Wheel label="Date dial" value={toDays(date)} min={toDays(lo)} max={toDays(hi)} step={1} pxPerStep={5}
+        format={(d) => spokenDate(fromDays(d))} onChange={(d) => setDate(fromDays(d), 'quiet')} tick={monthTick} />
     </div>
   );
 }
@@ -424,6 +444,7 @@ export function Controls() {
       <Brand />
       <TourCard />
       <MapKey />
+      <HomeTime />
       <nav className="bar glass" aria-label="Main">
         <Transport />
         <button type="button" aria-expanded={panel === 'assistant'} aria-controls="assistant" onClick={() => setPanel(panel === 'assistant' ? null : 'assistant')}>

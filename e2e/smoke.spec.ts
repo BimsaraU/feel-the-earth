@@ -14,19 +14,19 @@ test('load, unlock audio, move, toggle a layer, ask both questions, time travel'
   await expect(page.locator('.coords')).toContainText(/83\.2\d° E/); // a tap glides a quarter width
   await page.keyboard.press('KeyW');
   await expect(caption).toContainText('Window centre 7.9 north, 83.2 east');
-  await expect(caption).toContainText('Date: 14 November 2007.');
+  await expect(caption).toContainText('Date: 31 December 2023.');
 
   await page.keyboard.press('Digit2');
   await expect(caption).toContainText('Lightning on, the glockenspiel and the rain.');
-  await expect(caption).toContainText('so the date moved to 1 March 2017');
+  await expect(caption).toContainText('so you hear its nearest record');
 
   await page.keyboard.press('KeyM');
   await expect(page.getByRole('button', { name: /^2 Lightning/ })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('slider', { name: 'Date' })).toBeAttached();
+  await expect(page.getByRole('slider', { name: 'Date', exact: true })).toBeAttached();
 
   await page.keyboard.press('KeyH');
   await expect(caption).toContainText('Lightning,');
-  await expect(caption).toContainText('Sea surface temperature: no data in this window');
+  await expect(caption).toContainText('Sea surface temperature');
 
   await page.keyboard.press('KeyY');
   await expect(caption).toContainText('Time travel on: a day per bar.');
