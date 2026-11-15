@@ -15,7 +15,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm test           # unit tests
 npm run e2e        # Playwright smoke test (builds and serves on :4173)
-npm run build      # production build + service worker (works offline after first visit)
+npm run build      # production build + service worker (app shell offline; data cached as used)
 npm run mapping    # regenerate docs/MAPPING.md from src/audio/mapping.ts
 ```
 

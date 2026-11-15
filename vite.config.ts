@@ -22,9 +22,17 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Everything the demo needs is precached so it runs offline after the first visit.
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,jpg,woff2,mp3,bin,json,geojson}'],
+        // Only the app shell is precached (~2 MB), so a new deploy installs in seconds even on a phone. Precaching all
+        // ~45 MB of data made every update wait for the full download, and mobile browsers kept serving the old build.
+        // Data, tiles and audio are cached as they are first used, so places you have visited still work offline.
+        globPatterns: ['*.{html,svg,png}', 'assets/**/*.{js,css,woff2}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [{
+          urlPattern: ({ sameOrigin, url }) => sameOrigin && /\.(png|jpg|mp3|bin|json|geojson)$/.test(url.pathname),
+          handler: 'StaleWhileRevalidate', // cached copy at once, refreshed in the background
+          options: { cacheName: 'data', expiration: { maxEntries: 3000 } },
+        }],
       },
     }),
   ],
