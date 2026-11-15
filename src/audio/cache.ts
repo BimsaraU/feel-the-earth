@@ -1,7 +1,7 @@
 import * as Tone from 'tone';
 
 /** Bump when files under public/audio change, so browsers drop the old copies. */
-const CACHE = 'fte-audio-v4'; // v4: narration re-recorded in JODI's default voice (Upbeat)
+const CACHE = 'fte-audio-v5'; // v5: narration recorded in every voice, one folder each
 
 /**
  * Load an audio file into a Tone buffer through the browser's Cache Storage: the first visit downloads it, every

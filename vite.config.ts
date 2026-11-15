@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { chat, tts } from './api/_groq';
+import { VOICES_TTS } from './src/assist/voices';
 
 /** The Vercel functions in api/ (Groq assistant), served by the dev and preview servers too. Key from .env. */
 function api(): Plugin {
@@ -52,6 +53,8 @@ export default defineConfig({
         // data works offline from the first visit. Map tiles and atlas images (~35 MB) are cached as they are first
         // used; precaching those too made every deploy wait for the full download, so phones kept the old build.
         globPatterns: ['*.{html,svg,png}', 'assets/**/*.{js,css,woff2}', 'audio/**/*.{mp3,json}', 'data/**/*.{bin,json,geojson}'],
+        // Narration in the default voice only; the other voices' recordings are fetched (and cached) when chosen.
+        globIgnores: VOICES_TTS.slice(1).map((v) => `audio/narration/${v.name.toLowerCase()}/**`),
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         runtimeCaching: [{

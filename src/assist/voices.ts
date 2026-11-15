@@ -16,3 +16,5 @@ export const DEFAULT_VOICE: string = VOICES_TTS[0].id;
 export const personaOf = (voice: string): Persona => VOICES_TTS.find((v) => v.id === voice)?.persona ?? 'Jodi';
 /** Swap the default name in a fixed line (tours, welcome) for the current persona. */
 export const asPersona = (text: string, p: Persona) => (p === 'Jodi' ? text : text.replace(/\bJodi\b/g, p).replace(/\bJODI\b/g, p.toUpperCase()));
+/** Folder of a voice's recordings under public/audio/narration (the default voice for an unknown id). */
+export const voiceFolder = (voice: string) => (VOICES_TTS.find((v) => v.id === voice) ?? VOICES_TTS[0]).name.toLowerCase();

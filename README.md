@@ -20,7 +20,7 @@ npm run mapping    # regenerate docs/MAPPING.md from src/audio/mapping.ts
 ```
 
 Assets are committed. To rebuild them (needs network):
-`python scripts/prepare_audio.py`, `node scripts/build_narration.mjs` (JODI's Fish Audio voice for the welcome and tours; needs the Fish key), `python scripts/build_geo.py`, `python scripts/build_imagery.py` and `python scripts/build_elevation.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
+`python scripts/prepare_audio.py`, `node --experimental-strip-types scripts/build_narration.mjs` (start line, welcome and tours in every assistant voice, via Fish Audio; needs the Fish key), `python scripts/build_geo.py`, `python scripts/build_imagery.py` and `python scripts/build_elevation.py` (numpy, scipy, matplotlib, pillow, soundfile, imageio-ffmpeg).
 
 ## Keys
 

@@ -2,6 +2,7 @@ import { gsap } from 'gsap';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { glideStop, startFromGesture } from '../controller';
 import { useApp } from '../state';
+import { voiceFolder } from '../assist/voices';
 import { Controls } from './Controls';
 import { Globe } from './Globe';
 import StarField from './StarField';
@@ -20,7 +21,7 @@ function StartScreen() {
   useEffect(() => {
     // Best effort: JODI's recorded line (Fish Audio, scripts/build_narration.mjs), else the browser voice. Most browsers
     // only allow sound after a gesture, so the text is also on screen and focused.
-    const clip = new Audio(`${import.meta.env.BASE_URL}audio/narration/start.mp3`);
+    const clip = new Audio(`${import.meta.env.BASE_URL}audio/narration/${voiceFolder(useApp.getState().settings.jodiVoice)}/start.mp3`);
     clip.play().catch(() => { try { speechSynthesis.speak(new SpeechSynthesisUtterance(START_TEXT)); } catch { /* no TTS */ } });
     const key = (e: KeyboardEvent) => { e.preventDefault(); startFromGesture(); };
     window.addEventListener('keydown', key, { once: true });
