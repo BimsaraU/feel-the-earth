@@ -39,7 +39,7 @@ const voiceCache = new Map<string, Promise<Tone.ToneAudioBuffer>>();
 let neuralOffUntil = 0;
 
 function neural(text: string): Promise<Tone.ToneAudioBuffer> {
-  const voice = useApp.getState().settings.ttsVoice, key = voice + text;
+  const voice = useApp.getState().settings.jodiVoice, key = voice + text;
   let p = voiceCache.get(key);
   if (!p) {
     p = fetch(`${import.meta.env.BASE_URL}api/tts`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, voice }) })
@@ -47,7 +47,7 @@ function neural(text: string): Promise<Tone.ToneAudioBuffer> {
         if (!r.ok) throw new Error(`tts ${r.status}`);
         return new Tone.ToneAudioBuffer(await Tone.getContext().decodeAudioData(await r.arrayBuffer()));
       });
-    p.catch(() => { voiceCache.delete(key); neuralOffUntil = performance.now() + 60_000; });
+    p.catch(() => { voiceCache.delete(key); neuralOffUntil = performance.now() + 15_000; }); // brief: one bad request should not cost a minute of the real voice
     if (voiceCache.size > 300) voiceCache.delete(voiceCache.keys().next().value!);
     voiceCache.set(key, p);
   }
@@ -83,8 +83,8 @@ export function say(text: string, interrupt = true): Promise<void> {
       if (my !== gen) return;
       if (useNeural && performance.now() > neuralOffUntil) {
         try {
-          // The first part has to arrive quickly or the browser voice takes over; later ones load while it plays.
-          const b = await timeout(bufs[i], i === 0 ? 2500 : 8000);
+          // Wait generously for the neural voice (cold starts and long answers take seconds); later parts load while it plays.
+          const b = await timeout(bufs[i], i === 0 ? 9000 : 15000); // the real voice is worth a wait; the browser voice is the last resort
           if (my !== gen) return;
           await engine.playVoice(b);
           continue;
@@ -135,8 +135,8 @@ export async function converse(question: string, context: string): Promise<strin
   if (!navigator.onLine) return null;
   try {
     const r = await timeout(fetch(`${import.meta.env.BASE_URL}api/chat`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, context, name: personaOf(useApp.getState().settings.ttsVoice) }),
-    }), 8000);
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, context, name: personaOf(useApp.getState().settings.jodiVoice) }),
+    }), 20000);
     if (!r.ok) return null;
     const { answer } = (await r.json()) as { answer?: string };
     return answer || null;

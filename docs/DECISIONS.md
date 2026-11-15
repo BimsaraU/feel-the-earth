@@ -189,3 +189,5 @@ Non-obvious choices, newest last. Each entry: what, why, how to undo.
 
 86. **Taps never overshoot.** An arrow tap glides exactly a quarter width even when a busy main thread delivers the key-up late: tap vs hold is judged from the events' own timestamps (under 200 ms = tap), and until then the glide never passes the step.
 87. **Gojo and a confident female voice.** The voice list gains Upbeat (confident female). Each voice carries a persona: in Gojo's (male) voice the assistant calls itself Gojo everywhere: labels, chat answers (the server takes the name from an allowlist), live-spoken tours and welcome, and "Hey Gojo" wakes it too.
+
+88. **Upbeat is the default voice; JODI waits longer for it.** The neural voice now gets 9 s for the first part and 15 s for later parts (was 2.5 s / 8 s) before the browser voice steps in, a failed request benches it for 15 s (was 60 s), and chat answers get 20 s. Recordings redone in Upbeat; the voice setting was renamed (jodiVoice) so an old saved Sarah does not stick.

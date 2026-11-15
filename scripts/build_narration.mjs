@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'audio', 'narration');
-const VOICE = '933563129e564b19a115bedd57b7406a'; // Sarah: DEFAULT_VOICE in src/assist/voices.ts
+const VOICE = 'e107ce68d2a64e928c3a674781ce9d56'; // Upbeat: DEFAULT_VOICE in src/assist/voices.ts
 
 const dotenv = (() => {
   try {

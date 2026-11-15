@@ -24,7 +24,7 @@ const fromDays = (d: number) => new Date(d * DAY).toISOString().slice(0, 10);
 const coord = (v: number, p: string, n: string) => `${Math.abs(v).toFixed(2)}° ${v >= 0 ? p : n}`;
 
 /** The assistant's name in the chosen voice, upper case for labels (JODI, or GOJO in Gojo's voice). */
-const useName = () => personaOf(useApp((s) => s.settings.ttsVoice)).toUpperCase();
+const useName = () => personaOf(useApp((s) => s.settings.jodiVoice)).toUpperCase();
 
 /** Hold to speak to JODI (or Enter / K to start and stop; J held anywhere). */
 function PushToTalk() {
@@ -397,7 +397,7 @@ function Settings() {
           onChange={(x) => setSettings({ layerDb: { ...useApp.getState().settings.layerDb, [v.layer]: x } })} />
       ))}
       <label className="field">Assistant's voice
-        <select value={s.ttsVoice} onChange={(e) => { setSettings({ ttsVoice: e.target.value }); void say(`Hi, I'm ${personaOf(e.target.value)}. This is my voice.`); }}>
+        <select value={s.jodiVoice} onChange={(e) => { setSettings({ jodiVoice: e.target.value }); void say(`Hi, I'm ${personaOf(e.target.value)}. This is my voice.`); }}>
           {VOICES_TTS.map((v) => <option key={v.id} value={v.id}>{v.name} ({v.note})</option>)}
         </select>
       </label>

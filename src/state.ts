@@ -21,8 +21,8 @@ export interface Settings {
   probe: boolean;
   /** Peak/valley beacons ping while the window moves. Optional: they compete with the music. (Renamed from 'beacons', whose saved false came from an old default.) */
   navBeacons: boolean;
-  /** JODI's voice: a Fish Audio model id from assist/voices.ts. */
-  ttsVoice: string;
+  /** JODI's voice: a Fish Audio model id from assist/voices.ts. (Was ttsVoice; renamed so the old saved default goes.) */
+  jodiVoice: string;
   /** Listen in the background for "Hey Jodi" (needs the microphone). */
   wakeWord: boolean;
 }
@@ -65,7 +65,7 @@ export interface AppState {
 const SETTINGS_KEY = 'fte-settings';
 const defaults: Settings = {
   masterVolume: 0.7, layerDb: {}, speechRate: 1.1, voice: true, haptics: true, hapticAccents: false,
-  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true, navBeacons: true, ttsVoice: DEFAULT_VOICE,
+  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true, navBeacons: true, jodiVoice: DEFAULT_VOICE,
   // Off on phones: mobile browsers chime every time background recognition restarts.
   wakeWord: typeof matchMedia !== 'undefined' && !matchMedia('(pointer: coarse)').matches,
 };

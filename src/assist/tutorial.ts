@@ -19,9 +19,9 @@ let runId = 0;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const st = () => useApp.getState();
 /** The clips are recorded in the default voice. */
-const recorded = () => st().settings.ttsVoice === DEFAULT_VOICE;
+const recorded = () => st().settings.jodiVoice === DEFAULT_VOICE;
 /** Lines name the assistant Jodi; in Gojo's voice it calls itself Gojo. */
-const persona = (text: string) => asPersona(text, personaOf(st().settings.ttsVoice));
+const persona = (text: string) => asPersona(text, personaOf(st().settings.jodiVoice));
 const CLIP = (id: string) => `${import.meta.env.BASE_URL}audio/narration/${id}.mp3`;
 
 /** Back to what the listener had: the loop plays if they had it playing. */
