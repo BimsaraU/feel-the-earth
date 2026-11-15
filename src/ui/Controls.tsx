@@ -395,7 +395,8 @@ function Settings() {
       </label>
       <label className="check"><input type="checkbox" checked={s.mono} onChange={(e) => setSettings({ mono: e.target.checked })} /> Mono mix</label>
       <label className="check"><input type="checkbox" checked={s.spatial} onChange={(e) => setSettings({ spatial: e.target.checked })} /> Spatial field: hear each place from its direction (headphones)</label>
-      <label className="check"><input type="checkbox" checked={s.probe} onChange={(e) => setSettings({ probe: e.target.checked })} /> Peak and valley beacons, contour ticks</label>
+      <label className="check"><input type="checkbox" checked={s.probe} onChange={(e) => setSettings({ probe: e.target.checked })} /> Contour ticks (haptic)</label>
+      <label className="check"><input type="checkbox" checked={s.beacons} onChange={(e) => setSettings({ beacons: e.target.checked })} /> Peak and valley beacons while moving</label>
       <label className="check"><input type="checkbox" checked={s.highContrast} onChange={(e) => setSettings({ highContrast: e.target.checked })} /> High contrast</label>
     </div>
   );

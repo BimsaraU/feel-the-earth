@@ -75,6 +75,7 @@ function applySettings(keyChanged = false) {
   engine.setMono(s.mono);
   engine.field?.setEnabled(s.spatial);
   engine.terrain?.setEnabled(s.probe);
+  if (engine.terrain) engine.terrain.beacons = s.beacons;
   engine.keyRoot = s.keyRoot;
   for (const [id, v] of engine.voices) v.setLevel(s.layerDb[id] ?? 0);
   haptics.enabled = s.haptics;
@@ -203,7 +204,7 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
     scrub();
     // The loop holds its notes while you travel (it re-reads the window when you stop): pitch never follows motion.
     engine.setProbing(true);
-    if (st().settings.probe) engine.terrain?.move(lat, lon, st().size);
+    engine.terrain?.move(lat, lon, st().size); // contour ticks and beacons each follow their own setting
   }
 }
 

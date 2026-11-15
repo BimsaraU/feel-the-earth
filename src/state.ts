@@ -16,8 +16,10 @@ export interface Settings {
   highContrast: boolean;
   /** Spatial field: Earth-anchored data points around the window, each heard from its true direction (HRTF). */
   spatial: boolean;
-  /** Peak/valley beacons and contour haptics while the window moves. */
+  /** Contour haptics while the window moves. */
   probe: boolean;
+  /** Peak/valley beacons ping while the window moves. Off by default: they compete with the music. */
+  beacons: boolean;
 }
 
 /** The data map around the window, HALO times its size, sampled for every active layer. Feeds the 3D view and the surround field. */
@@ -54,7 +56,7 @@ export interface AppState {
 const SETTINGS_KEY = 'fte-settings';
 const defaults: Settings = {
   masterVolume: 0.7, layerDb: {}, speechRate: 1.1, voice: true, haptics: true, hapticAccents: false,
-  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true,
+  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true, beacons: false,
 };
 
 function loadSettings(): Settings {

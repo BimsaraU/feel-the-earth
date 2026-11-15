@@ -101,7 +101,7 @@ interface Beacon { synth: Tone.Synth; pan: Tone.Panner3D; spot: Spot | null; nex
 
 export class Terrain {
   private out = new Tone.Gain(1);
-  private beacons: Record<'peak' | 'valley', Beacon>;
+  private pings: Record<'peak' | 'valley', Beacon>;
   private halo: Halo | null = null;
   private grid: Float32Array | null = null;
   private pos = { lat: 0, lon: 0, size: 10 };
@@ -110,7 +110,10 @@ export class Terrain {
   private timer = 0;
   private restTimer = 0;
   private moving = false;
+  /** Contour ticks. */
   enabled = true;
+  /** Beacons ping while moving ("Find peak and valley" pings regardless). */
+  beacons = false;
   /** Latest reading, for "Find peak and valley" and the UI. */
   last: Relief | null = null;
   /** A contour was crossed (dir +1 up, -1 down): haptic detent. */
@@ -125,7 +128,7 @@ export class Terrain {
       return { synth, pan, spot: null, next: 0, midi: octave, ratio, armed: false };
     };
     // Peak: high, rising fifth. Valley: low, falling fourth.
-    this.beacons = { peak: make('sine', 84, 1.5), valley: make('triangle', 48, 0.75) };
+    this.pings = { peak: make('sine', 84, 1.5), valley: make('triangle', 48, 0.75) };
   }
 
   setEnabled(on: boolean) {
@@ -144,11 +147,10 @@ export class Terrain {
   /** The window moved (or was resized) under the listener's hand. */
   move(lat: number, lon: number, size: number) {
     this.pos = { lat, lon, size };
-    if (!this.enabled) return;
     this.moving = true;
     clearTimeout(this.restTimer);
     this.restTimer = window.setTimeout(() => this.rest(), 350);
-    this.ping(800); // beacons are a navigation aid: they ping while you move and fall silent soon after you stop
+    if (this.beacons) this.ping(800); // a navigation aid: ping while you move, fall silent soon after you stop
     this.read();
   }
 
@@ -156,6 +158,7 @@ export class Terrain {
   ping(ms: number) {
     this.until = Math.max(this.until, performance.now() + ms);
     if (!this.timer) this.timer = window.setInterval(() => this.tick(), 40);
+    this.tick(); // first ping now, not on the next timer tick
   }
 
   private rest(now = false) {
@@ -164,22 +167,22 @@ export class Terrain {
   }
 
   private read() {
-    if (!this.halo || !this.grid) { this.last = null; this.beacons.peak.spot = this.beacons.valley.spot = null; return; }
+    if (!this.halo || !this.grid) { this.last = null; this.pings.peak.spot = this.pings.valley.spot = null; return; }
     const { lat, lon, size } = this.pos;
     const r = (this.last = relief(this.halo, this.grid, lat, lon, size));
     for (const k of ['peak', 'valley'] as const) {
-      const b = this.beacons[k], prev = b.spot, s = (b.spot = r[k]);
+      const b = this.pings[k], prev = b.spot, s = (b.spot = r[k]);
       if (!s) continue;
       // Arrival counts only for a place you travelled to: it was far, and it stayed put while you closed in
       // (on plateaus the extreme can jump under the window by itself).
       const still = !!prev && Math.hypot(s.lat - prev.lat, wrap(s.lon - prev.lon)) < 0.15 * size;
       const d = s.dist || 1e-6;
-      b.pan.positionX.rampTo(s.east / d, 0.1);
-      b.pan.positionZ.rampTo(-s.north / d, 0.1); // listener faces -Z: north is ahead
+      b.pan.positionX.rampTo(s.east / d, 0.05, Tone.immediate());
+      b.pan.positionZ.rampTo(-s.north / d, 0.05, Tone.immediate()); // listener faces -Z: north is ahead
       if (s.dist > 0.4) b.armed = true;
       else if (s.dist < ARRIVE && b.armed && still) { b.armed = false; if (this.moving) this.onArrive?.(k, s); }
     }
-    if (!this.moving || Number.isNaN(r.t)) return;
+    if (!this.moving || !this.enabled || Number.isNaN(r.t)) return;
     // Contour detents, with hysteresis so a value sitting on a boundary does not chatter.
     const p = rung(r, 16);
     if (this.idx < 0 || Math.abs(p - this.idx) > 0.6) {
@@ -189,17 +192,22 @@ export class Terrain {
     }
   }
 
+  /** Pings are scheduled on the audio clock up to 150 ms ahead, so a busy main thread (map redraws) cannot make the
+   *  rhythm stumble, and the first one starts at once (Tone.immediate, not Tone.now with its lookahead delay). */
   private tick() {
     if (performance.now() > this.until) { clearInterval(this.timer); this.timer = 0; return; }
-    const now = Tone.now();
-    for (const b of Object.values(this.beacons)) {
+    const now = Tone.immediate();
+    for (const b of Object.values(this.pings)) {
       const s = b.spot;
-      if (!s || s.dist < ARRIVE || now < b.next) continue;
+      if (!s || s.dist < ARRIVE) continue;
+      if (b.next < now) b.next = now + 0.01;
       const near = 1 - Math.min(1, s.dist / 1.25);
-      const f = Tone.Frequency(b.midi + this.keyRoot(), 'midi').toFrequency(), vel = 0.12 + 0.5 * near;
-      b.synth.triggerAttackRelease(f, 0.05, now, vel);
-      b.synth.triggerAttackRelease(f * b.ratio, 0.05, now + 0.075, vel);
-      b.next = now + 0.2 + 1.0 * (1 - near);
+      const f = Tone.Frequency(b.midi + this.keyRoot(), 'midi').toFrequency(), vel = 0.1 + 0.4 * near;
+      while (b.next < now + 0.15) {
+        b.synth.triggerAttackRelease(f, 0.05, b.next, vel);
+        b.synth.triggerAttackRelease(f * b.ratio, 0.05, b.next + 0.075, vel);
+        b.next += 0.2 + 1.0 * (1 - near);
+      }
     }
   }
 }

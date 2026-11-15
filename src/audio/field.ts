@@ -27,7 +27,7 @@ const SPACING = 1 / 3;
 /** How far you hear, in window widths. Matches the halo (2.5 x the window). */
 const REACH = 1.25;
 /** Grain voices (FM synth + HRTF panner each). Fewer on phones, where HRTF convolution is the main audio cost. */
-const POOL = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 12 : 20;
+const POOL = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 8 : 14;
 const REGISTER: [number, number] = [55, 88];
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;

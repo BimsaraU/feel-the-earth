@@ -216,11 +216,11 @@ class AudioEngine {
 
   /** Must be called synchronously inside the first user gesture. */
   unlock() {
-    // A larger audio buffer and scheduling lead stop crackles when the map, React and the grains all compete for the
-    // main thread (worst on phones). Costs ~0.1 s of latency on one-shots, which nothing here needs to beat.
-    // Must happen before any Tone node exists. ponytail: 'playback' on touch devices, 'balanced' elsewhere, tune by ear.
+    // The largest audio buffer ('playback') and a generous scheduling lead stop crackles when the map, React and the
+    // grains all compete for the CPU. Navigation sounds that must answer at once (beacons) schedule from
+    // Tone.immediate(), so they do not pay the lookahead. Must happen before any Tone node exists.
     const touch = matchMedia('(pointer: coarse)').matches;
-    Tone.setContext(new Tone.Context({ latencyHint: touch ? 'playback' : 'balanced', lookAhead: touch ? 0.2 : 0.12 }));
+    Tone.setContext(new Tone.Context({ latencyHint: 'playback', lookAhead: touch ? 0.2 : 0.15 }));
     // Tone.start resumes the context; calling it inside the gesture is what browsers require.
     const started = Tone.start();
     document.addEventListener('visibilitychange', () => {
@@ -258,12 +258,14 @@ class AudioEngine {
     this.motionWet = new Tone.Gain(0);
     this.stack.chain(this.duck, this.motionTilt);
     this.motionTilt.chain(this.motionPan, this.motionDry, master);
-    this.motionTilt.chain(this.motion3d, this.motionWet, master);
+    // Wet gain BEFORE the HRTF panner: at rest it outputs silence, and browsers skip HRTF convolution on silent input
+    // (HRTF on the whole mix all the time was a large, constant share of the audio thread).
+    this.motionTilt.chain(this.motionWet, this.motion3d, master);
     this.events = new Tone.Gain(Tone.dbToGain(-4)).connect(master);
     this.narration = new Tone.Gain(1).connect(master);
     // The grains bypass the music duck: while you move they are the main voice.
     this.field = new Field(new Tone.Gain(Tone.dbToGain(-2)).connect(master), () => this); // Score: keyRoot + mood
-    this.terrain = new Terrain(new Tone.Gain(Tone.dbToGain(-3)).connect(master), () => this.keyRoot);
+    this.terrain = new Terrain(new Tone.Gain(Tone.dbToGain(-9)).connect(master), () => this.keyRoot); // beacons sit under the music
 
     this.shots = await load(manifest.oneshots);
     for (const name of ['clave', 'framedrum', 'smallbell', 'gong', 'cymbal', 'ratchet', 'thump', 'singingbowl', 'wave', 'whoosh', 'windchime']) {

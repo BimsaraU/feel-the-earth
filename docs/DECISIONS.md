@@ -173,3 +173,9 @@ Non-obvious choices, newest last. Each entry: what, why, how to undo.
 76. **Home date dial.** The date wheel also sits at the bottom of the home screen as a small pill with the date. Touching, scrolling or focusing it rolls out the full drum; it tucks away 1.4 s after release.
 
 77. **Conversational assistant (Groq).** The key stays on the server: Vercel edge functions api/chat and api/tts (also served by the dev and preview servers), key from GROQ_API_KEY or GROQ. Open questions and anything the command grammar does not match go to openai/gpt-oss-120b with the moment's context (place, date, layers, values, nearest records); answers are one to three spoken sentences. All speech uses the Orpheus neural voice (hannah) in chunks of at most 200 characters, cached per phrase; if the first chunk takes over 2.5 s or the service fails, the browser voice speaks and the neural voice rests for a minute. Calls from other origins are refused.
+
+78. **Beacons are optional, off by default.** Peak/valley pings competed with the music, so they have their own setting ("Peak and valley beacons while moving"), 6 dB quieter, separate from contour ticks. "Find peak and valley" still pings on request. Pings are scheduled on the audio clock from Tone.immediate() up to 150 ms ahead: no lookahead delay on the first ping, no timer jitter after.
+
+79. **Heatmap painting in a Web Worker.** The per-pixel paint (up to 2048 x 2048, bicubic) ran on the main thread and stalled the audio scheduler on every redraw, heard as stumbles. It now runs in src/ui/paint.worker.ts. Audio context uses the 'playback' latency hint everywhere; the motion HRTF panner sits after its wet gain so it is silent (and skipped) at rest; grain pool 14 (8 on phones).
+
+80. **CO2 smoothed for display.** Carbon dioxide retrievals scatter by a few ppm, which showed as speckle. The map applies three NaN-aware 3 x 3 passes (filling isolated missing cells); the sound still reads the raw data.
