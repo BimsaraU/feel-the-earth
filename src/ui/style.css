@@ -200,6 +200,25 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
 .wheel-mark::before { top: 0; border-top-color: var(--accent); }
 .wheel-mark::after { bottom: 0; border-bottom-color: var(--accent); }
 
+/* ---- home date dial: a pill at rest, the full drum while engaged (camera zoom wheel style) ---- */
+.home-time { position: absolute; left: 50%; bottom: var(--gap); transform: translateX(-50%); z-index: 2;
+  width: 168px; transition: width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.home-time .wheel-field { margin: 0; }
+.home-time .wheel-head { justify-content: center; }
+.home-time .wheel-head span { display: none; }
+.home-time .wheel-head output { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; line-height: 34px; text-align: center;
+  font-weight: 500; pointer-events: none; transition: bottom 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.home-time.open .wheel-head output { bottom: calc(100% + 6px); text-shadow: 0 1px 10px #000; }
+.home-time .wheel { height: 34px; margin: 0; border-radius: 999px; background: var(--glass-strong); backdrop-filter: blur(14px);
+  transition: height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 0.35s, background 0.35s; }
+.home-time .wheel-scale, .home-time .wheel-shade { opacity: 0; transition: opacity 0.25s; }
+.home-time .wheel-mark { opacity: 0; transition: opacity 0.25s; }
+.home-time.open { width: min(560px, calc(100vw - 2 * var(--gap))); }
+.home-time.open .wheel { height: 60px; border-radius: 14px; background: linear-gradient(#1b1f38, #2c3254 46%, #232844 54%, #0e1124); }
+.home-time.open .wheel-scale, .home-time.open .wheel-shade { opacity: 1; }
+.home-time.open .wheel-mark { opacity: 1; }
+.app:has(.tour) .home-time { display: none; }
+
 /* ---- assistant: typed commands and the phrase list ---- */
 .ask { display: flex; gap: 6px; margin-top: 6px; }
 .ask input { flex: 1; min-width: 0; min-height: 48px; padding: 0 12px; font: 400 0.9rem var(--sans); color: var(--ink);
@@ -233,6 +252,7 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
   .bar kbd { display: none; }
   .mapkey { width: auto; right: var(--gap); padding: 10px 12px; }
   .mapkey-marks { display: none; }
+  .home-time { bottom: calc(var(--gap) + 136px); } /* above the full-width map key */
   .sidebar { top: auto; right: 0; left: 0; bottom: 0; width: 100%; max-height: 62vh; border-radius: 20px 20px 0 0; z-index: 4; }
 }
 
@@ -258,3 +278,28 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent);
 .tour-text { font: 300 0.92rem/1.45 var(--sans); color: var(--muted); margin-bottom: 8px; }
 .app:has(.tour) .caption { opacity: 0; } /* the tour card shows the words; the caption stays as the live region */
 .app:has(.tour) .mapkey { display: none; }
+
+/* JODI: stand-in avatar, a small wobbling orange Earth with a headband and a face. */
+.jodi-btn { display: inline-flex; align-items: center; gap: 8px; }
+.jodi { position: relative; flex: none; width: 26px; height: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffd08a 0 10%, #ff9f45 38%, #e0561c 72%, #9c2f0c 100%);
+  box-shadow: 0 0 10px rgba(255, 159, 69, 0.55), inset -2px -3px 4px rgba(120, 30, 0, 0.35);
+  animation: jodi-wobble 2.6s ease-in-out infinite; }
+.jodi::after { content: ''; position: absolute; left: -2px; right: -2px; top: 18%; height: 17%; border-radius: 4px;
+  background: linear-gradient(90deg, #ffb36b, #fff0dc, #ffb36b); box-shadow: 0 0 6px rgba(255, 210, 160, 0.8); transform: rotate(-8deg); }
+.jodi::before { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid transparent; }
+.jodi-face { position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 37% 54%, #3a1405 0 1.5px, transparent 2px), radial-gradient(circle at 63% 54%, #3a1405 0 1.5px, transparent 2px); }
+.jodi-face::after { content: ''; position: absolute; left: 39%; width: 22%; top: 62%; height: 12%; border-bottom: 1.5px solid #3a1405; border-radius: 0 0 50% 50%; }
+.jodi-listening { animation: jodi-wobble 1.2s ease-in-out infinite, jodi-pulse 1s ease-out infinite; }
+.jodi-thinking::before { border-top-color: rgba(255, 200, 140, 0.9); border-right-color: rgba(255, 200, 140, 0.5); animation: jodi-spin 0.9s linear infinite; }
+.jodi-speaking { animation: jodi-talk 0.32s ease-in-out infinite alternate; }
+.jodi-speaking .jodi-face::after { animation: jodi-mouth 0.18s ease-in-out infinite alternate; }
+@keyframes jodi-wobble { 0%, 100% { transform: rotate(-7deg) scale(1, 1); } 25% { transform: rotate(5deg) scale(1.05, 0.95); }
+  50% { transform: rotate(8deg) scale(0.97, 1.03); } 75% { transform: rotate(-4deg) scale(1.03, 0.97); } }
+@keyframes jodi-pulse { from { box-shadow: 0 0 0 0 rgba(255, 159, 69, 0.75), 0 0 14px rgba(255, 159, 69, 0.9); }
+  to { box-shadow: 0 0 0 9px rgba(255, 159, 69, 0), 0 0 14px rgba(255, 159, 69, 0.9); } }
+@keyframes jodi-spin { to { transform: rotate(360deg); } }
+@keyframes jodi-talk { from { transform: translateY(0) scale(1, 1); } to { transform: translateY(-2px) scale(1.06, 0.94); } }
+@keyframes jodi-mouth { from { height: 8%; } to { height: 22%; } }
+@media (prefers-reduced-motion: reduce) { .jodi, .jodi::before, .jodi-face::after { animation: none !important; } }

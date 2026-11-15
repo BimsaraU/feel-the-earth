@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { DEFAULT_VOICE } from './assist/voices';
 import type { BBox, LayerId, LayerInfo } from './data/types';
 
 export interface Settings {
@@ -16,9 +17,17 @@ export interface Settings {
   highContrast: boolean;
   /** Spatial field: Earth-anchored data points around the window, each heard from its true direction (HRTF). */
   spatial: boolean;
-  /** Peak/valley beacons and contour haptics while the window moves. */
+  /** Contour haptics while the window moves. */
   probe: boolean;
+  /** Peak/valley beacons ping while the window moves. Optional: they compete with the music. (Renamed from 'beacons', whose saved false came from an old default.) */
+  navBeacons: boolean;
+  /** JODI's voice: a Fish Audio model id from assist/voices.ts. */
+  ttsVoice: string;
+  /** Listen in the background for "Hey Jodi" (needs the microphone). */
+  wakeWord: boolean;
 }
+
+export type JodiState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 /** The data map around the window, HALO times its size, sampled for every active layer. Feeds the 3D view and the surround field. */
 export interface Halo { box: BBox; n: number; lat: number; lon: number; size: number; grids: Partial<Record<LayerId, Float32Array>> }
@@ -43,7 +52,11 @@ export interface AppState {
   tour: { i: number; n: number; title: string; text: string } | null;
   /** Window mean per active layer, from the last loop regeneration. */
   means: Partial<Record<LayerId, number>>;
+  /** Date of the record heard per active layer (nearest frame when the date is outside its record). */
+  frames: Partial<Record<LayerId, string | null>>;
   halo: Halo | null;
+  /** What the assistant JODI is doing, for its avatar. */
+  jodi: JodiState;
   settings: Settings;
   set: (p: Partial<AppState>) => void;
   setSettings: (p: Partial<Settings>) => void;
@@ -52,7 +65,9 @@ export interface AppState {
 const SETTINGS_KEY = 'fte-settings';
 const defaults: Settings = {
   masterVolume: 0.7, layerDb: {}, speechRate: 1.1, voice: true, haptics: true, hapticAccents: false,
-  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true,
+  navSpeed: 0.6, keyRoot: 2, mono: false, highContrast: false, spatial: true, probe: true, navBeacons: true, ttsVoice: DEFAULT_VOICE,
+  // Off on phones: mobile browsers chime every time background recognition restarts.
+  wakeWord: typeof matchMedia !== 'undefined' && !matchMedia('(pointer: coarse)').matches,
 };
 
 function loadSettings(): Settings {
@@ -71,7 +86,7 @@ export const useApp = create<AppState>((set) => ({
   lat: 7.9,
   lon: 80.7,
   size: 10,
-  date: '2007-11-14', // inside the sea surface temperature record (2007-03-25 .. 2008-03-03)
+  date: '2023-12-28', // replaced at boot by the most recent date of any layer
   playing: false,
   dragging: false,
   globeMode: false,
@@ -79,7 +94,9 @@ export const useApp = create<AppState>((set) => ({
   live: '',
   tour: null,
   means: {},
+  frames: {},
   halo: null,
+  jodi: 'idle',
   settings: loadSettings(),
   set: (p) => set(p),
   setSettings: (p) =>

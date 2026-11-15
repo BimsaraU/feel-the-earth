@@ -12,7 +12,6 @@ interface ManifestLayer {
 
 const DAY = 86400000;
 const days = (iso: string) => Date.parse(iso + 'T00:00:00Z') / DAY;
-const HALF_WINDOW: Record<ManifestLayer['cadence'], number> = { daily: 1, '10-day': 5, monthly: 16, annual: 183, static: Infinity };
 
 export class EicSource implements DataSource {
   private manifest: Promise<ManifestLayer[]>;
@@ -33,15 +32,23 @@ export class EicSource implements DataSource {
     }));
   }
 
-  /** Index of the frame that covers a date, or -1. Annual frames cover their year; static covers 2012..2023. */
+  /** Index of the frame that covers a date. Annual frames cover their year, monthly their month. Synchronised time:
+   *  outside a layer's record (or in a gap) the nearest frame stands in, so every layer always plays something. */
   frameFor(l: ManifestLayer, dateISO: string): number {
-    if (l.cadence === 'annual') return l.dates.findIndex((d) => d.slice(0, 4) === dateISO.slice(0, 4));
-    if (l.cadence === 'monthly') return l.dates.findIndex((d) => d.slice(0, 7) === dateISO.slice(0, 7));
-    if (l.cadence === 'static') return dateISO >= '2012' && dateISO < '2024' ? 0 : -1;
+    if (l.cadence === 'static') return 0;
+    const exact = l.cadence === 'annual' ? l.dates.findIndex((d) => d.slice(0, 4) === dateISO.slice(0, 4))
+      : l.cadence === 'monthly' ? l.dates.findIndex((d) => d.slice(0, 7) === dateISO.slice(0, 7)) : -1;
+    if (exact >= 0) return exact;
     const t = days(dateISO);
-    let best = -1, bestD = Infinity;
+    let best = 0, bestD = Infinity;
     l.dates.forEach((d, i) => { const dd = Math.abs(days(d) - t); if (dd < bestD) { bestD = dd; best = i; } });
-    return bestD <= HALF_WINDOW[l.cadence] ? best : -1;
+    return best;
+  }
+
+  /** Date of the frame actually heard for a layer at a date (differs from the date outside its record). */
+  async frameDate(id: LayerId, dateISO: string): Promise<string | null> {
+    const l = (await this.manifest).find((x) => x.id === id);
+    return l ? l.dates[this.frameFor(l, dateISO)] : null;
   }
 
   private atlas(file: string): Promise<Uint8Array> {
@@ -67,7 +74,7 @@ export class EicSource implements DataSource {
     const l = (await this.manifest).find((x) => x.id === layerId)!;
     const grid = new Float32Array(n * n).fill(NaN);
     const f = l ? this.frameFor(l, dateISO) : -1;
-    if (f >= 0) {
+    if (f >= 0 && l.dates.length) {
       const px = await this.atlas(l.atlases[Math.floor(f / l.perAtlas)]);
       const row0 = (f % l.perAtlas) * l.height;
       const { width: W, height: H, res } = l;

@@ -6,7 +6,8 @@ import { moodOf } from './audio/harmony';
 import { denorm, norm, severity, voiceFor } from './audio/mapping';
 import { placeName, spokenDate, spokenNumber, whatAmIHearing, whereAmI } from './assist/answers';
 import { announce, say } from './assist/speech';
-import { source } from './data';
+import { welcome } from './assist/tutorial';
+import { frameDate, source } from './data';
 import { normLon } from './data/fixture';
 import type { BBox, LayerId } from './data/types';
 import { GeoEventTracker, LINE_NAMES, type GeoEvent } from './geo/events';
@@ -40,9 +41,8 @@ async function boot() {
   geo = g;
   tracker = new GeoEventTracker(g);
   tracker.reset(st().lat, st().lon);
-  const [lo, hi] = layers[0].timeRange;
-  const date = st().date < lo ? lo : st().date > hi ? hi : st().date;
-  st().set({ layers, date, started: true, loading: false });
+  // Times are synchronised (every layer plays its nearest record), so start on the most recent date of any layer.
+  st().set({ layers, date: dateBounds(layers)[1], started: true, loading: false });
   haptics.init();
   applySettings();
   useApp.subscribe((s, prev) => { if (s.settings !== prev.settings) applySettings(prev.settings.keyRoot !== s.settings.keyRoot); });
@@ -65,9 +65,7 @@ async function boot() {
   engine.startLoop();
   st().set({ playing: true });
   const demo = layers.some((l) => l.demo) ? 'This build plays DEMO DATA, not NASA data. ' : '';
-  void say(`${demo}Feel the Earth. You are listening to ${placeName(g, st().lat, st().lon)}. ` +
-    'Arrow keys move the listening window. Plus and minus change its size. Numbers 1 to 9 switch layers. ' +
-    'W: where am I. H: what am I hearing. Comma and full stop step through days. T takes the listening tour. V turns this voice off.');
+  void welcome(placeName(g, st().lat, st().lon), demo);
 }
 
 function applySettings(keyChanged = false) {
@@ -76,6 +74,7 @@ function applySettings(keyChanged = false) {
   engine.setMono(s.mono);
   engine.field?.setEnabled(s.spatial);
   engine.terrain?.setEnabled(s.probe);
+  if (engine.terrain) engine.terrain.beacons = s.navBeacons;
   engine.keyRoot = s.keyRoot;
   for (const [id, v] of engine.voices) v.setLevel(s.layerDb[id] ?? 0);
   haptics.enabled = s.haptics;
@@ -97,6 +96,7 @@ async function regenerate() {
   const box = bboxOf(lat, lon, size);
   const means: Partial<Record<LayerId, number>> = {};
   const wins = await Promise.all(active.map((id) => source.getWindow(id, box, date, 32)));
+  const frames = Object.fromEntries(await Promise.all(active.map(async (id) => [id, await frameDate(id, date)] as const)));
   // Conductor: the most dangerous active layer sets the ensemble's severity and mood for every voice.
   engine.severity = Math.max(0, ...active.map((id, k) => severity(voiceFor(id), norm(wins[k].stats.mean, layerInfo(id)))));
   engine.mood = moodOf(engine.severity);
@@ -106,7 +106,7 @@ async function regenerate() {
     const pattern = engine.voices.get(id)?.render(win, layerInfo(id));
     void pattern;
   }));
-  st().set({ means });
+  st().set({ means, frames });
   void refreshHalo();
 }
 
@@ -184,7 +184,11 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
     engine.setMotion(motion.e, motion.n);
   }
   clearTimeout(whooshStop);
-  whooshStop = window.setTimeout(() => { engine.setMoveSpeed(0); motion.e = motion.n = 0; engine.setMotion(0, 0); engine.setProbing(false); }, settle ? 250 : 350);
+  whooshStop = window.setTimeout(() => {
+    engine.setMoveSpeed(0); motion.e = motion.n = 0; engine.setMotion(0, 0); engine.setProbing(false);
+    // Moving stopped: end the many-borders clave patter. Only drags ended it before, so key moves left it ticking forever.
+    if (tracker) tracker.tick(performance.now() + 2000).forEach((e) => playEvent(e));
+  }, settle ? 250 : 350);
 
   st().set({ lat, lon });
   engine.field?.move(lat, lon, st().size);
@@ -199,7 +203,7 @@ export function setCenter(lat: number, lon: number, settle: boolean) {
     scrub();
     // The loop holds its notes while you travel (it re-reads the window when you stop): pitch never follows motion.
     engine.setProbing(true);
-    if (st().settings.probe) engine.terrain?.move(lat, lon, st().size);
+    engine.terrain?.move(lat, lon, st().size); // contour ticks and beacons each follow their own setting
   }
 }
 
@@ -220,7 +224,9 @@ function updateSurface() {
 // A tap still travels at least a quarter width (a full width with Shift), as the keyboard spec asks.
 export type Dir = 'n' | 's' | 'e' | 'w';
 const held = new Set<Dir>();
-const glide = { raf: 0, last: 0, vLat: 0, vLon: 0, travelled: 0, min: 0, dir: 'n' as Dir };
+const glide = { raf: 0, last: 0, vLat: 0, vLon: 0, travelled: 0, min: 0, dir: 'n' as Dir, downAt: 0, tap: false };
+/** A key released within this long is a tap, even if a busy main thread delivered the key-up late. */
+const TAP_MS = 200;
 
 export function glideStart(dir: Dir, full = false) {
   if (!st().started) return;
@@ -228,14 +234,18 @@ export function glideStart(dir: Dir, full = false) {
   glide.dir = dir;
   glide.min = st().size * (full ? 1 : 0.25);
   glide.travelled = 0;
+  glide.downAt = performance.now();
+  glide.tap = false;
   if (glide.raf) return;
   glide.last = performance.now();
   dragStart();
   glide.raf = requestAnimationFrame(glideTick);
 }
 
-export function glideStop(dir: Dir) {
+/** tapMs: how long the key was down by the events' own timestamps (a tap never overshoots its step). */
+export function glideStop(dir: Dir, tapMs = Infinity) {
   held.delete(dir);
+  if (tapMs < TAP_MS && !held.size) glide.tap = true;
 }
 
 /** One discrete step (buttons activated by keyboard, screen readers). */
@@ -274,9 +284,12 @@ function glideTick(now: number) {
     const k = 1 - Math.exp(-dt * 9); // ease towards the target velocity
     glide.vLat += ((held.has('n') ? speed : 0) - (held.has('s') ? speed : 0) - glide.vLat) * k;
     glide.vLon += ((held.has('e') ? speed : 0) - (held.has('w') ? speed : 0) - glide.vLon) * k;
-    if (!held.size && Math.hypot(glide.vLat, glide.vLon) < speed * 0.03) return glideEnd();
-    glide.travelled += Math.hypot(glide.vLat, glide.vLon) * dt;
-    setCenter(lat + glide.vLat * dt, lon + glide.vLon * dt, false);
+    if (!held.size && (glide.tap || Math.hypot(glide.vLat, glide.vLon) < speed * 0.03)) return glideEnd();
+    // While it could still be a tap, never go past the tap's step.
+    const step = Math.hypot(glide.vLat, glide.vLon) * dt;
+    const f = now - glide.downAt < TAP_MS && step > 0 ? Math.max(0, Math.min(1, (glide.min - glide.travelled) / step)) : 1;
+    glide.travelled += step * f;
+    setCenter(lat + glide.vLat * dt * f, lon + glide.vLon * dt * f, false);
   }
   glide.raf = requestAnimationFrame(glideTick);
 }
@@ -337,13 +350,8 @@ export function toggleLayer(id: LayerId) {
     st().set({ active: [...active, id] });
     const [lo, hi] = info.timeRange;
     const { date } = st();
-    let moved = '';
-    if (date < lo || date > hi) {
-      const to = date < lo ? lo : hi;
-      st().set({ date: to });
-      moved = ` Its record runs from ${spokenDate(lo)} to ${spokenDate(hi)}, so the date moved to ${spokenDate(to)}.`;
-    }
-    void say(`${info.name} on, ${v.instrumentSpoken}.${info.demo ? ' Demo data.' : ''}${moved}`);
+    const note = date < lo || date > hi ? ` Its record runs from ${spokenDate(lo)} to ${spokenDate(hi)}, so you hear its nearest record.` : '';
+    void say(`${info.name} on, ${v.instrumentSpoken}.${info.demo ? ' Demo data.' : ''}${note}`);
   }
   syncVoices();
   scheduleRegen();
@@ -410,8 +418,7 @@ function travelStep() {
   d.setUTCDate(d.getUTCDate() + days);
   const next = d.toISOString().slice(0, 10);
   // Stop at the end of the record of the layers being heard.
-  const end = st().active.map((id) => layerInfo(id)?.timeRange[1] ?? '').sort().pop() ?? dateBounds()[1];
-  if (next > end) { setTravelling(false); void say('End of the record.'); return; }
+  if (next > dateBounds()[1]) { setTravelling(false); void say('End of the record.'); return; }
   engine.play('ratchet', { db: -14 });
   setDate(next, 'quiet');
 }
@@ -492,17 +499,20 @@ export async function askWhat() {
 
 const topLayer = () => { const a = st().active; return a.length ? layerInfo(a[a.length - 1]) : undefined; };
 
-/** Where the highest and lowest values near the window are; their beacons ping for a few seconds. */
-export function askBeacons() {
+/** Where the highest (B) and/or lowest (V) value near the window is; its beacon pings for a few seconds. */
+export function askBeacons(which: 'peak' | 'valley' | 'both' = 'both') {
   const top = topLayer(), r = engine.terrain?.last;
   if (!top || !r) { void say('No layer on the map to search.'); return; }
   if (!r.peak || !r.valley) { void say(`${top.name} is flat or missing around here.`); return; }
   const { size } = st();
-  const where = (s: NonNullable<typeof r.peak>) => (s.dist < 0.12 ? 'right here'
-    : `${spokenNumber(s.dist * size)} degrees ${compassWord(((Math.atan2(s.east, s.north) * 180) / Math.PI + 360) % 360)}`);
-  engine.terrain?.ping(6000);
-  void say(`${top.name}. Highest nearby, the high beacon: ${spokenNumber(denorm(r.peak.t, top))} ${top.unitSpoken}, ${where(r.peak)}. ` +
-    `Lowest nearby, the low beacon: ${spokenNumber(denorm(r.valley.t, top))} ${top.unitSpoken}, ${where(r.valley)}.`);
+  const one = (k: 'peak' | 'valley') => {
+    const s = r[k]!;
+    const where = s.dist < 0.12 ? 'right here'
+      : `${spokenNumber(s.dist * size)} degrees ${compassWord(((Math.atan2(s.east, s.north) * 180) / Math.PI + 360) % 360)}`;
+    return `${k === 'peak' ? 'Highest nearby, the high beacon' : 'Lowest nearby, the low beacon'}: ${spokenNumber(denorm(s.t, top))} ${top.unitSpoken}, ${where}.`;
+  };
+  engine.terrain?.ping(6000, which === 'both' ? null : which);
+  void say(`${top.name}. ${which === 'both' ? `${one('peak')} ${one('valley')}` : one(which)}`);
 }
 
 export function togglePlay() {

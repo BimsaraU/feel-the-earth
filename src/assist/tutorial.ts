@@ -1,5 +1,6 @@
-// Listening tour: a narrated walk through every sound, what it means and why it sounds that way.
-// Narration is pre-recorded with a neural voice (scripts/build_narration.py, text in narration.json);
+// Tours, spoken by JODI: the welcome at start, the listening tour (T: every sound, what it means and why it sounds that
+// way) and the assistant tour (Shift+T or "help": how to talk to JODI).
+// Narration is pre-recorded with JODI's Fish Audio voice (scripts/build_narration.mjs, text in narration.json);
 // without the clips, or with the voice guide off, it falls back to the browser voice / captions.
 // Each demo also fires the visuals (src/fx.ts) so sound, picture and words line up.
 
@@ -11,11 +12,16 @@ import type { LayerId } from '../data/types';
 import { fx } from '../fx';
 import { useApp } from '../state';
 import NARRATION from './narration.json';
-import { announce, say, stopSpeech } from './speech';
+import { asPersona, DEFAULT_VOICE, personaOf } from './voices';
+import { announce, say, speechGen, stopSpeech } from './speech';
 
 let runId = 0;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const st = () => useApp.getState();
+/** The clips are recorded in the default voice. */
+const recorded = () => st().settings.ttsVoice === DEFAULT_VOICE;
+/** Lines name the assistant Jodi; in Gojo's voice it calls itself Gojo. */
+const persona = (text: string) => asPersona(text, personaOf(st().settings.ttsVoice));
 const CLIP = (id: string) => `${import.meta.env.BASE_URL}audio/narration/${id}.mp3`;
 
 /** Back to what the listener had: the loop plays if they had it playing. */
@@ -36,10 +42,16 @@ export function skipNarration() {
   if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
 }
 
-async function narrate(id: string, i: number) {
-  const seg = NARRATION.find((n) => n.id === id)!;
-  st().set({ tour: { i, n: NARRATION.length, title: seg.title, text: seg.text } });
-  if (!st().settings.voice) return say(seg.text); // captions only, timed to reading speed
+type Tour = 'listening' | 'assistant';
+type Segment = (typeof NARRATION)[number] & { tour?: string };
+const segments = (tour: Tour | 'welcome') => (NARRATION as Segment[]).filter((s) => (s.tour ?? 'listening') === tour);
+
+async function narrate(id: string, i: number, n: number) {
+  const raw = NARRATION.find((x) => x.id === id)!;
+  const seg = { ...raw, title: persona(raw.title), text: persona(raw.text) };
+  st().set({ tour: { i, n, title: seg.title, text: seg.text } });
+  // Captions only (timed to reading speed) with the voice off; live speech when JODI has another voice than the recording.
+  if (!st().settings.voice || !recorded()) return say(seg.text);
   announce(seg.text);
   try { await engine.playClip(CLIP(id)); } catch { await say(seg.text); }
 }
@@ -100,6 +112,8 @@ const ACTIONS: Record<string, () => Promise<void> | void> = {
     playEvent({ type: 'line', line: 'primeMeridian' }); await wait(2200);
   },
   antimeridian: async () => { playEvent({ type: 'line', line: 'antimeridian' }); await wait(2600); },
+  beacons: async () => { engine.play('smallbell', { rate: 1.5, db: -12 }); await wait(1400); }, // arrival bell
+  'a-peak': async () => { engine.play('smallbell', { rate: 1.5, db: -12 }); await wait(1400); },
   time: async () => {
     engine.play('ratchet', { db: -4 }); fx.emit({ kind: 'time', big: false }); await wait(1200);
     engine.play('windchime', { db: -6 }); fx.emit({ kind: 'time', big: true }); await wait(1800);
@@ -112,15 +126,17 @@ async function lowHigh(layer: LayerId, lo: number, hi: number) {
   restoreAll();
 }
 
-export async function runTutorial() {
+/** T: the listening tour; Shift+T / "help": the assistant tour. */
+export async function runTutorial(tour: Tour = 'listening') {
   stopTutorial();
   const id = ++runId;
   const live = () => id === runId;
   const t0 = performance.now();
-  for (const [i, seg] of NARRATION.entries()) {
+  const list = segments(tour);
+  for (const [i, seg] of list.entries()) {
     if (!live()) break;
     if (seg.id === 'pitch') engine.pauseLoop(); // demos play on their own from here
-    await narrate(seg.id, i);
+    await narrate(seg.id, i, list.length);
     if (!live()) break;
     await ACTIONS[seg.id]?.();
   }
@@ -128,4 +144,19 @@ export async function runTutorial() {
   st().set({ tour: null });
   console.info(`Tour took ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   resumeLoop();
+}
+
+/** Spoken welcome at start: JODI introduces the app, names the place, and points to the tours. Escape or any new
+ *  speech cuts it short. The place is live speech between the two recorded parts. */
+export async function welcome(place: string, prefix = '') {
+  const id = ++runId;
+  if (prefix) await say(prefix);
+  const g = speechGen(); // anything else said with interruption (W, H, a command) ends the welcome
+  const live = () => id === runId && speechGen() === g;
+  const [a, b] = segments('welcome');
+  for (const [seg, after] of [[a, `You are now listening to ${place}.`], [b, '']] as const) {
+    if (!live()) return;
+    if (!st().settings.voice || !recorded()) { await say(persona(seg.text)); } else { announce(seg.text); try { await engine.playClip(CLIP(seg.id)); } catch { await say(seg.text); } }
+    if (after && live()) await say(after, false);
+  }
 }

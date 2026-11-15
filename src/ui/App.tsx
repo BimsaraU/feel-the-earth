@@ -7,6 +7,7 @@ import { Globe } from './Globe';
 import StarField from './StarField';
 import { onKey, onKeyUp } from './keyboard';
 
+const COARSE = matchMedia('(pointer: coarse)').matches;
 const START_TEXT = 'Tap or press any key to begin. Headphones recommended.';
 
 function StartScreen() {
@@ -17,11 +18,13 @@ function StartScreen() {
     gsap.from(root.current.children, { opacity: 0, y: 24, filter: 'blur(10px)', duration: 1.4, stagger: 0.18, ease: 'power3.out' });
   }, []);
   useEffect(() => {
-    // Best effort: most browsers only allow speech after a gesture, so the text is also on screen and focused.
-    try { speechSynthesis.speak(new SpeechSynthesisUtterance(START_TEXT)); } catch { /* no TTS */ }
+    // Best effort: JODI's recorded line (Fish Audio, scripts/build_narration.mjs), else the browser voice. Most browsers
+    // only allow sound after a gesture, so the text is also on screen and focused.
+    const clip = new Audio(`${import.meta.env.BASE_URL}audio/narration/start.mp3`);
+    clip.play().catch(() => { try { speechSynthesis.speak(new SpeechSynthesisUtterance(START_TEXT)); } catch { /* no TTS */ } });
     const key = (e: KeyboardEvent) => { e.preventDefault(); startFromGesture(); };
     window.addEventListener('keydown', key, { once: true });
-    return () => window.removeEventListener('keydown', key);
+    return () => { window.removeEventListener('keydown', key); clip.pause(); };
   }, []);
   return (
     <>
@@ -57,7 +60,8 @@ export function App() {
   if (!started) return <StartScreen />;
   return (
     <main className="app">
-      <StarField aria-hidden="true" clickWarp={false} />
+      {/* Behind the globe: on phones the stars hold still (one frame), leaving the GPU and main thread to the map and audio. */}
+      <StarField aria-hidden="true" clickWarp={false} disableAnimation={COARSE} mouseInteraction={!COARSE} dpr={1} />
       <Globe />
       <Controls />
     </main>

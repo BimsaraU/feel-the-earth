@@ -110,7 +110,7 @@ export const FEATURES = [
   { feature: 'Point roughness (spread inside it)', sound: 'Articulation: smooth places long soft grains (0.42 s), patchy places short plucked ones (0.1 s).' },
   { feature: "Point past its layer's danger line", sound: 'Harmony: a semitone clash above its chord tone.' },
   { feature: 'Contours, while moving', sound: 'Silent haptic tick at every 1/16 of value crossed (40 % absolute, 60 % local scale).' },
-  { feature: 'Highest and lowest value within 1.25 window widths', sound: 'Beacons at their true bearing: peak = two rising high notes, valley = two falling low notes, fixed pitch; pings get faster and louder as you approach. B speaks where they are.' },
+  { feature: 'Highest and lowest value within 1.25 window widths', sound: 'Beacons at their true bearing: peak = two rising high notes, valley = two falling low notes, fixed pitch; pings get faster and louder as you approach. B speaks where the peak is, V the valley.' },
 ];
 
 export const EVENT_SOUNDS = [

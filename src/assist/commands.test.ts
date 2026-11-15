@@ -18,11 +18,16 @@ describe('assistant commands', () => {
     ['next month', { kind: 'frame', step: 1, unit: 'month' }],
     ['previous year', { kind: 'frame', step: -1, unit: 'year' }],
     ['next', { kind: 'layerStep', step: 1 }],
+    ['why is the sea warmer to the east', { kind: 'unknown' }], // open question: the conversational assistant
     ['zoom in', { kind: 'zoom', step: 1 }],
     ['wider', { kind: 'window', step: 1 }],
     ['what am I hearing', { kind: 'what' }],
     ['where am I', { kind: 'where' }],
-    ['find the peak', { kind: 'beacons' }],
+    ['find the peak', { kind: 'beacons', which: 'peak' }],
+    ['where is the lowest valley', { kind: 'beacons', which: 'valley' }],
+    ['peak and valley', { kind: 'beacons', which: 'both' }],
+    ['help', { kind: 'tour', which: 'assistant' }],
+    ['start the tutorial', { kind: 'tour', which: 'listening' }],
     ['time travel off', { kind: 'travel', on: false }],
     ['louder', { kind: 'volume', step: 1 }],
     ['explorer', { kind: 'explore', on: true }],
@@ -38,5 +43,13 @@ describe('assistant commands', () => {
     expect(c.lat).toBeCloseTo(7.8, 0);
     expect(c.lon).toBeCloseTo(80.7, 0);
     expect(geo.centreOf('Fiji')!.lon).toBeGreaterThan(170); // straddles the antimeridian: circular mean
+  });
+});
+
+describe('wake word', () => {
+  it('hears Hey Jodi and its usual mishearings, not the bare name in speech', async () => {
+    const { WAKE } = await import('./commands');
+    for (const s of ['hey Jodi', 'Hey Jody, go to Peru', 'ok judy what is this', 'hi jodie', 'hey Gojo', 'hey go joe take me to Peru']) expect(WAKE.test(s)).toBe(true);
+    for (const s of ['jodi', 'the jodhpur heat', 'hey there']) expect(WAKE.test(s)).toBe(false);
   });
 });

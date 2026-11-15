@@ -30,8 +30,8 @@ export type Command =
   | { kind: 'theme'; dark: boolean }
   | { kind: 'where' }
   | { kind: 'what' }
-  | { kind: 'beacons' }
-  | { kind: 'tour' }
+  | { kind: 'beacons'; which: 'peak' | 'valley' | 'both' }
+  | { kind: 'tour'; which: 'listening' | 'assistant' }
   | { kind: 'travel'; on: boolean }
   | { kind: 'goto'; place: string }
   | { kind: 'repeat' }
@@ -115,13 +115,19 @@ export function parseCommand(raw: string): Command {
   const t = normalise(raw);
   if (!t) return { kind: 'unknown' };
 
-  if (has(t, /\b(help|what can i say|commands|what do i say)\b/)) return { kind: 'help' };
+  if (has(t, /\b(what can i say|commands|what do i say)\b/)) return { kind: 'help' };
+  if (has(t, /\b(help|command guide|assistant tour|voice tour)\b/)) return { kind: 'tour', which: 'assistant' };
   if (has(t, /\b(repeat|again|say that again|what did you say)\b/)) return { kind: 'repeat' };
   if (has(t, /\b(where am i|where is this|whats here|what is here|location)\b/)) return { kind: 'where' };
   if (has(t, /\b(what am i hearing|what is playing|whats playing|what do i hear|hearing)\b/)) return { kind: 'what' };
-  if (has(t, /\b(peak|valley|highest|lowest|beacons?)\b/)) return { kind: 'beacons' };
-  if (has(t, /\b(tour|tutorial|guide me)\b/)) return { kind: 'tour' };
+  if (has(t, /\b(peak|valley|highest|lowest|beacons?)\b/)) {
+    const hi = /\b(peak|highest)\b/.test(t), lo = /\b(valley|lowest)\b/.test(t);
+    return { kind: 'beacons', which: hi === lo ? 'both' : hi ? 'peak' : 'valley' };
+  }
+  if (has(t, /\b(tour|tutorial|guide me)\b/)) return { kind: 'tour', which: 'listening' };
   if (has(t, /\btime travel\b/)) return { kind: 'travel', on: !has(t, /\b(off|stop|end)\b/) };
+  // Open questions ("why is the sea warmer to the east") go to the conversational assistant, not to keyword commands.
+  if (/^(why|how|what|which|who|when|is|are|does|do|tell me|explain)\b/.test(t) && t.split(' ').length >= 4) return { kind: 'unknown' };
 
   // "go to France", "take me to India", "show me Brazil" (a layer name wins: "show lightning").
   // The place comes from the raw words: near-miss correction must not turn "Niger" into "night".
@@ -230,7 +236,10 @@ export function matchPlace(spoken: string, names: string[]): string | null {
 
 /** Spoken help: the commands, short. */
 export const HELP_TEXT =
-  'Press K or hold Ask, then say a command, or type it. Play, pause, resume. A layer: ocean, lightning, night lights, light change, carbon dioxide, ' +
+  'Hold J, or say hey Jodi, then say a command, or type it. Play, pause, resume. A layer: ocean, lightning, night lights, light change, carbon dioxide, ' +
   'air temperature, rain, vegetation, or aerosols. Next and previous layer. North, south, east, west, or far north. Go to a country or sea, like go to France. ' +
   'Wider, narrower, point, whole world. Next day, previous month, next year. Zoom in, zoom out, reset zoom. Louder, quieter, faster, slower. ' +
-  'Where am I. What am I hearing. Find the peak. Legend. Tour. Time travel. Describe on or off. Repeat, and help.';
+  'Where am I. What am I hearing. Find the peak. Find the valley. Legend. Tour. Assistant tour. Time travel. Describe on or off. Repeat. Help plays the assistant tour.';
+
+/** "Hey Jodi" (or "Hey Gojo", the male voice's name) and what recognizers commonly hear for them. */
+export const WAKE = /\b(?:hey|hi|hay|a|ok|okay)[,\s]+(?:jodi|jody|jodie|judy|jodhi|joadie|jordy|joti|jodee|gojo|go jo|go joe|gojou)\b[,.!?]?/i;

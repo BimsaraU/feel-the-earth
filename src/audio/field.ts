@@ -26,7 +26,8 @@ import { norm, scaleNotes, severity, voiceFor } from './mapping';
 const SPACING = 1 / 3;
 /** How far you hear, in window widths. Matches the halo (2.5 x the window). */
 const REACH = 1.25;
-const POOL = 20;
+/** Grain voices (FM synth + HRTF panner each). Fewer on phones, where HRTF convolution is the main audio cost. */
+const POOL = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 8 : 14;
 const REGISTER: [number, number] = [55, 88];
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
@@ -120,6 +121,8 @@ export class Field {
   private points: Point[] = [];
   private next = 0;
   enabled = true;
+  /** Window moving: the field sounds even with the music paused (paused and still = silence). */
+  moving = false;
 
   constructor(dest: Tone.InputNode, private score: () => Score) {
     this.out.connect(dest);
@@ -163,10 +166,11 @@ export class Field {
   /** Lookahead scheduler: every 16th note, each point may emit a grain (probability = its rate x step). */
   private schedule() {
     if (!this.enabled || !this.points.length || Tone.getContext().state !== 'running') return;
+    if (Tone.getTransport().state !== 'started' && !this.moving) { this.next = 0; return; }
     const transport = Tone.getTransport(), step = 60 / transport.bpm.value / 4, now = Tone.now();
     if (this.next < now) this.next = transport.state === 'started' ? transport.nextSubdivision('16n') : now + 0.03;
     const { keyRoot, mood } = this.score();
-    while (this.next < now + 0.1) {
+    while (this.next < now + 0.25) { // 250 ms ahead: survives main-thread stalls (map redraws) without gaps
       const t = this.next;
       this.next += step;
       const bar = transport.state === 'started' ? Math.floor(transport.getTicksAtTime(t) / transport.PPQ / 4) : 0;
