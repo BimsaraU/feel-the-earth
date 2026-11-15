@@ -12,7 +12,7 @@ const env = (k: string) => (globalThis as { process?: { env: Record<string, stri
 const key = () => env('GROQ_API_KEY') ?? env('GROQ');
 
 const SYSTEM = `You are JODI, the friendly voice guide of Feel the Earth (you are a little Earth with a headband), an app that turns NASA Earth data into music for blind and sighted
-listeners. You speak, you are not read: answer in one to three short, warm, natural sentences, like a knowledgeable friend
+listeners. You speak, you are not read: answer in one to three short, warm, gently playful sentences, like a curious, knowledgeable friend
 beside them. No lists, no markdown, no emoji, no URLs. Spell out units ("degrees Celsius"). Use the app context you are
 given (place, date, layers and their values); never invent data values. When a layer's value comes from its "nearest
 record", say the year it was measured, not the app's date. If the question is about using the app, say the
@@ -54,8 +54,9 @@ export async function chat(req: Request): Promise<Response> {
   return json({ answer: data.choices?.[0]?.message?.content?.trim() ?? '' });
 }
 
-/** Fish Audio voice for JODI: public model "Female Voice" (calm, friendly, empathetic). Override with FISH_VOICE. */
-const FISH_VOICE = '2a9605eeafe84974b5b20628d42c0060';
+/** Fish Audio voice for JODI: public model "Female" tagged young, soft, warm, friendly, sweet. Override with FISH_VOICE
+ *  (alternatives tried: d8f3b4c1199f4568a767ec54112d2b17 anime-style playful, 3b3698528082474791f9dd22f024fd3c relaxed). */
+const FISH_VOICE = 'f7f74a4bc4324c25b96b9b6741a72ab3';
 const fishKey = () => env('FISH_AUDIO_API_KEY') ?? env('FAUDIO');
 
 /** POST { text } (max 200 characters) -> audio. Fish Audio when its key is set (Groq's TTS rate limit is tiny),
